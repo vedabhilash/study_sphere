@@ -51,7 +51,9 @@ const MONGODB_URI = process.env.MONGODB_URI || 'mongodb://localhost:27017/studys
 mongoose.connect(MONGODB_URI)
   .then(async () => {
     console.log('Successfully connected to MongoDB Database');
-    await seedDatabase();
+    if (process.env.SEED_DB === 'true') {
+      await seedDatabase();
+    }
     server.listen(PORT, () => {
       console.log(`StudySphere Backend server running on port ${PORT}`);
     });
