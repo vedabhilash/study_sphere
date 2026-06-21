@@ -13,8 +13,15 @@ export default function Navbar({
   activeGroup, 
   setActiveGroup, 
   joinedGroups, 
-  currentStudent 
+  currentStudent,
+  unreadGroups = {},
+  onClearGroupUnread,
+  notifications = {}
 }) {
+  const totalDirectNotifications = React.useMemo(() => {
+    return Object.values(notifications).reduce((acc, count) => acc + count, 0);
+  }, [notifications]);
+
   return (
     <aside className="sidebar">
       <div className="sidebar-logo">
@@ -40,9 +47,25 @@ export default function Navbar({
             setActiveGroup(null);
           }}
           className={`nav-item ${activeTab === 'matches' ? 'active' : ''}`}
+          style={{ position: 'relative' }}
         >
-          <Compass size={18} />
-          <span>Match Finder</span>
+          <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', width: '100%' }}>
+            <Compass size={18} style={{ flexShrink: 0 }} />
+            <span style={{ flex: 1, textAlign: 'left' }}>Match Finder</span>
+            {totalDirectNotifications > 0 && (
+              <span className="badge" style={{ 
+                background: '#ff4d4f', 
+                color: 'white', 
+                borderRadius: '10px', 
+                padding: '2px 6px', 
+                fontSize: '0.65rem', 
+                fontWeight: 'bold',
+                flexShrink: 0
+              }}>
+                {totalDirectNotifications}
+              </span>
+            )}
+          </div>
         </button>
 
         <button 
@@ -69,19 +92,35 @@ export default function Navbar({
                 onClick={() => {
                   setActiveGroup(group);
                   setActiveTab('workspace');
+                  if (onClearGroupUnread) onClearGroupUnread(group.id);
                 }}
                 className={`workspace-item ${activeTab === 'workspace' && activeGroup?.id === group.id ? 'active' : ''}`}
+                style={{ cursor: 'pointer' }}
               >
-                <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', overflow: 'hidden' }}>
+                <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', overflow: 'hidden', width: '100%' }}>
                   <BookOpen size={14} style={{ flexShrink: 0 }} />
                   <span style={{ 
                     overflow: 'hidden', 
                     textOverflow: 'ellipsis', 
                     whiteSpace: 'nowrap',
-                    fontWeight: activeGroup?.id === group.id ? '600' : 'normal'
+                    fontWeight: activeGroup?.id === group.id ? '600' : 'normal',
+                    flex: 1
                   }}>
                     {group.name}
                   </span>
+                  {unreadGroups && unreadGroups[group.id] > 0 && (
+                    <span className="badge" style={{ 
+                      background: '#ff4d4f', 
+                      color: 'white', 
+                      borderRadius: '10px', 
+                      padding: '2px 6px', 
+                      fontSize: '0.65rem', 
+                      fontWeight: 'bold',
+                      flexShrink: 0
+                    }}>
+                      {unreadGroups[group.id]}
+                    </span>
+                  )}
                 </div>
               </div>
             ))

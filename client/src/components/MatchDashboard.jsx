@@ -7,7 +7,8 @@ export default function MatchDashboard({
   allStudents, 
   joinedGroups, 
   onInviteToGroup, 
-  onOpenQuickChat 
+  onOpenQuickChat,
+  notifications = {}
 }) {
   const [searchQuery, setSearchQuery] = React.useState('');
   const [courseFilter, setCourseFilter] = React.useState('All');
@@ -148,9 +149,26 @@ export default function MatchDashboard({
                   <button 
                     onClick={() => onOpenQuickChat(student)}
                     className="btn btn-secondary"
+                    style={{ position: 'relative' }}
                   >
                     <MessageSquare size={16} />
                     <span>Chat</span>
+                    {notifications && notifications[student.id] > 0 && (
+                      <span className="badge" style={{ 
+                        position: 'absolute',
+                        top: '-8px',
+                        right: '-8px',
+                        background: '#ff4d4f', 
+                        color: 'white', 
+                        borderRadius: '10px', 
+                        padding: '2px 6px', 
+                        fontSize: '0.65rem', 
+                        fontWeight: 'bold',
+                        boxShadow: '0 2px 8px rgba(255, 77, 79, 0.4)'
+                      }}>
+                        {notifications[student.id]}
+                      </span>
+                    )}
                   </button>
                   <button 
                     onClick={() => handleOpenInvite(student)}

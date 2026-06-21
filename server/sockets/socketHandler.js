@@ -56,15 +56,15 @@ export default function configureSockets(io) {
       socket.to(groupId).emit('incomingClearBoard');
     });
 
-    // Peer-to-Peer Direct Message Rooms
-    socket.on('joinDirectMessage', ({ roomName }) => {
-      socket.join(roomName);
-      console.log(`Client ${socket.id} joined DM room: ${roomName}`);
+    // Register the user to their own personal room for notifications/DMs
+    socket.on('registerUser', ({ userId }) => {
+      socket.join(`user-${userId}`);
+      console.log(`User ${userId} registered to room user-${userId}`);
     });
 
-    socket.on('sendDirectMessage', ({ roomName, message }) => {
-      // Broadcast the direct message in the private room
-      socket.to(roomName).emit('incomingDirectMessage', message);
+    socket.on('sendDirectMessage', ({ receiverId, message }) => {
+      // Send directly to the receiver's personal room
+      io.to(`user-${receiverId}`).emit('incomingDirectMessage', message);
     });
 
     socket.on('disconnect', () => {

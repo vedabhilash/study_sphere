@@ -32,14 +32,33 @@ export default function App() {
 
   // Routing
   const [activeTab, setActiveTab] = React.useState('profile');
+  const activeTabRef = React.useRef('profile');
+  React.useEffect(() => {
+    activeTabRef.current = activeTab;
+  }, [activeTab]);
+
   const [activeGroup, setActiveGroup] = React.useState(null);
+  const activeGroupRef = React.useRef(null);
+  React.useEffect(() => {
+    activeGroupRef.current = activeGroup;
+  }, [activeGroup]);
 
   // Floating Quick Chat Modal State
   const [quickChatStudent, setQuickChatStudent] = React.useState(null);
+  const quickChatStudentRef = React.useRef(null);
+  React.useEffect(() => {
+    quickChatStudentRef.current = quickChatStudent;
+  }, [quickChatStudent]);
+
   const [quickChatInput, setQuickChatInput] = React.useState('');
   const [quickChatHistory, setQuickChatHistory] = React.useState([]);
   const [quickChatTyping, setQuickChatTyping] = React.useState(false);
   const quickChatScrollRef = React.useRef(null);
+
+  // Notifications State
+  const [notifications, setNotifications] = React.useState({});
+  const [unreadGroups, setUnreadGroups] = React.useState({});
+  const [toast, setToast] = React.useState({ show: false, title: '', content: '', senderId: null, groupId: null });
 
   // Check login session on mount
   React.useEffect(() => {
@@ -48,6 +67,16 @@ export default function App() {
       loadSession();
     }
   }, []);
+
+  // Auto-dismiss toast notification after 5s
+  React.useEffect(() => {
+    if (toast.show) {
+      const timer = setTimeout(() => {
+        setToast(prev => ({ ...prev, show: false }));
+      }, 5000);
+      return () => clearTimeout(timer);
+    }
+  }, [toast.show]);
 
   // Initialize socket when authenticated
   React.useEffect(() => {
@@ -58,6 +87,7 @@ export default function App() {
 
       socket.on('connect', () => {
         console.log('Socket channel active:', socket.id);
+        socket.emit('registerUser', { userId: currentStudent.id });
       });
 
       // Listen for group message broadcasts
@@ -76,11 +106,41 @@ export default function App() {
             return g;
           })
         );
+
+        // Show notification badge for the group if not active workspace
+        if (activeTabRef.current !== 'workspace' || !activeGroupRef.current || activeGroupRef.current.id !== groupId) {
+          setUnreadGroups(prev => ({
+            ...prev,
+            [groupId]: (prev[groupId] || 0) + 1
+          }));
+
+          setToast({
+            show: true,
+            title: `New in ${message.senderName || 'Group'}`,
+            content: `${message.senderName}: ${message.content}`,
+            groupId: groupId
+          });
+        }
       });
 
       // Listen for private direct messages
       socket.on('incomingDirectMessage', (message) => {
-        setQuickChatHistory(prev => [...prev, message]);
+        const senderId = message.senderId;
+        if (quickChatStudentRef.current && quickChatStudentRef.current.id === senderId) {
+          setQuickChatHistory(prev => [...prev, message]);
+        } else {
+          setNotifications(prev => ({
+            ...prev,
+            [senderId]: (prev[senderId] || 0) + 1
+          }));
+
+          setToast({
+            show: true,
+            title: `New message from ${message.senderName || 'Peer'}`,
+            content: message.content,
+            senderId: senderId
+          });
+        }
       });
 
       return () => {
@@ -311,17 +371,18 @@ export default function App() {
   const handleOpenQuickChat = (student) => {
     setQuickChatStudent(student);
     
-    // Sort IDs deterministically to create a private room name
-    const roomName = `dm-${[currentStudent.id, student.id].sort().join('-')}`;
-    
-    if (socket) {
-      socket.emit('joinDirectMessage', { roomName });
-    }
+    // Clear notifications for this student
+    setNotifications(prev => ({
+      ...prev,
+      [student.id]: 0
+    }));
 
     setQuickChatHistory([
       {
         id: 'start',
         sender: 'them',
+        senderId: student.id,
+        senderName: student.name,
         content: `Hey! I saw that we got matching compatibility for study groups. What classes are you working on?`,
         time: 'Just now'
       }
@@ -332,11 +393,11 @@ export default function App() {
     e.preventDefault();
     if (!quickChatInput.trim() || !quickChatStudent) return;
 
-    const roomName = `dm-${[currentStudent.id, quickChatStudent.id].sort().join('-')}`;
-
     const userMsg = {
       id: `qm-user-${Date.now()}`,
       sender: 'me',
+      senderId: currentStudent.id,
+      senderName: currentStudent.name,
       content: quickChatInput,
       time: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })
     };
@@ -344,7 +405,10 @@ export default function App() {
     setQuickChatHistory(prev => [...prev, userMsg]);
     
     if (socket) {
-      socket.emit('sendDirectMessage', { roomName, message: { ...userMsg, sender: 'them' } });
+      socket.emit('sendDirectMessage', { 
+        receiverId: quickChatStudent.id, 
+        message: { ...userMsg, sender: 'them' } 
+      });
     }
     
     setQuickChatInput('');
@@ -480,6 +544,9 @@ export default function App() {
         setActiveGroup={setActiveGroup}
         joinedGroups={joinedGroups}
         currentStudent={currentStudent}
+        unreadGroups={unreadGroups}
+        onClearGroupUnread={(groupId) => setUnreadGroups(prev => ({ ...prev, [groupId]: 0 }))}
+        notifications={notifications}
       />
 
       {/* Main Container */}
@@ -506,6 +573,7 @@ export default function App() {
             joinedGroups={joinedGroups}
             onInviteToGroup={handleInviteStudentToGroup}
             onOpenQuickChat={handleOpenQuickChat}
+            notifications={notifications}
           />
         )}
 
@@ -674,6 +742,59 @@ export default function App() {
               <Send size={14} />
             </button>
           </form>
+        </div>
+      )}
+
+      {/* Toast Notification */}
+      {toast.show && (
+        <div 
+          className="glass-card"
+          onClick={() => {
+            if (toast.groupId) {
+              const group = groups.find(g => g.id === toast.groupId);
+              if (group) {
+                setActiveGroup(group);
+                setActiveTab('workspace');
+                setUnreadGroups(prev => ({ ...prev, [toast.groupId]: 0 }));
+              }
+            } else if (toast.senderId) {
+              const student = allStudents.find(s => s.id === toast.senderId);
+              if (student) {
+                handleOpenQuickChat(student);
+              }
+            }
+            setToast({ show: false, title: '', content: '', senderId: null, groupId: null });
+          }}
+          style={{
+            position: 'fixed',
+            top: '1.5rem',
+            right: '1.5rem',
+            zIndex: 1000,
+            cursor: 'pointer',
+            padding: '1rem',
+            width: '300px',
+            borderLeft: '4px solid var(--primary)',
+            boxShadow: '0 10px 40px rgba(0, 0, 0, 0.4)',
+            background: 'var(--bg-secondary)',
+            backdropFilter: 'blur(20px)',
+            borderRadius: 'var(--radius-md)'
+          }}
+        >
+          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '0.25rem', gap: '1rem' }}>
+            <strong style={{ fontSize: '0.9rem', color: 'var(--primary)' }}>{toast.title}</strong>
+            <button 
+              onClick={(e) => {
+                e.stopPropagation();
+                setToast({ show: false, title: '', content: '', senderId: null, groupId: null });
+              }}
+              style={{ background: 'transparent', border: 'none', color: 'var(--text-muted)', cursor: 'pointer', fontSize: '1.1rem', padding: 0 }}
+            >
+              <X size={14} />
+            </button>
+          </div>
+          <p style={{ fontSize: '0.8rem', color: 'var(--text-secondary)', margin: 0, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+            {toast.content}
+          </p>
         </div>
       )}
     </div>
