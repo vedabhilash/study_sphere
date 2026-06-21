@@ -13,6 +13,11 @@ export default function VirtualRoom({ group, currentStudent, allStudents, socket
   const [localStream, setLocalStream] = React.useState(null);
   const [screenStream, setScreenStream] = React.useState(null);
 
+  // WebRTC States
+  const peerConnections = React.useRef({});
+  const remoteStreams = React.useRef({});
+  const [remoteVideoStreams, setRemoteVideoStreams] = React.useState({});
+
   // Whiteboard Canvas States
   const canvasRef = React.useRef(null);
   const [isDrawing, setIsDrawing] = React.useState(false);
@@ -123,6 +128,145 @@ export default function VirtualRoom({ group, currentStudent, allStudents, socket
       screenVideoRef.current.srcObject = screenStream;
     }
   }, [screenStream, sharingScreen]);
+
+  // WebRTC Peer Connection Manager
+  React.useEffect(() => {
+    if (!socket || !localStream) return;
+
+    const myId = currentStudent.id;
+
+    // Helper to get or create RTCPeerConnection for a member
+    function getOrCreatePeerConnection(memberId) {
+      if (peerConnections.current[memberId]) {
+        return peerConnections.current[memberId];
+      }
+
+      console.log(`Creating RTCPeerConnection for member: ${memberId}`);
+      const pc = new RTCPeerConnection({
+        iceServers: [
+          { urls: 'stun:stun.l.google.com:19302' },
+          { urls: 'stun:stun1.l.google.com:19302' }
+        ]
+      });
+
+      // Track candidate queue
+      pc.iceCandidatesQueue = [];
+
+      // Add local stream tracks to this peer connection
+      localStream.getTracks().forEach(track => {
+        pc.addTrack(track, localStream);
+      });
+
+      // Handle ICE candidates
+      pc.onicecandidate = (event) => {
+        if (event.candidate) {
+          socket.emit('videoCallSignal', {
+            targetId: memberId,
+            senderId: myId,
+            signal: { type: 'candidate', candidate: event.candidate }
+          });
+        }
+      };
+
+      // Handle remote tracks
+      pc.ontrack = (event) => {
+        console.log(`Received remote track from ${memberId}:`, event.streams[0]);
+        remoteStreams.current[memberId] = event.streams[0];
+        setRemoteVideoStreams(prev => ({
+          ...prev,
+          [memberId]: event.streams[0]
+        }));
+      };
+
+      peerConnections.current[memberId] = pc;
+      return pc;
+    }
+
+    // Alphabetically smaller ID initiates the call
+    otherMembers.forEach(async (member) => {
+      const memberId = member.id;
+      const pc = getOrCreatePeerConnection(memberId);
+
+      if (String(myId) < String(memberId)) {
+        console.log(`We are initiating call to ${memberId}`);
+        try {
+          const offer = await pc.createOffer();
+          await pc.setLocalDescription(offer);
+          socket.emit('videoCallSignal', {
+            targetId: memberId,
+            senderId: myId,
+            signal: { type: 'offer', sdp: offer }
+          });
+        } catch (err) {
+          console.error("Error creating offer: ", err);
+        }
+      }
+    });
+
+    // Listen for incoming signals
+    const handleIncomingSignal = async ({ senderId, signal }) => {
+      if (!otherMembers.some(m => String(m.id) === String(senderId))) return;
+
+      const pc = getOrCreatePeerConnection(senderId);
+
+      try {
+        if (signal.type === 'offer') {
+          console.log(`Received offer from ${senderId}`);
+          await pc.setRemoteDescription(new RTCSessionDescription(signal.sdp));
+          
+          // Apply queued candidates
+          if (pc.iceCandidatesQueue && pc.iceCandidatesQueue.length > 0) {
+            for (const cand of pc.iceCandidatesQueue) {
+              await pc.addIceCandidate(new RTCIceCandidate(cand));
+            }
+            pc.iceCandidatesQueue = [];
+          }
+          
+          const answer = await pc.createAnswer();
+          await pc.setLocalDescription(answer);
+          socket.emit('videoCallSignal', {
+            targetId: senderId,
+            senderId: myId,
+            signal: { type: 'answer', sdp: answer }
+          });
+        } else if (signal.type === 'answer') {
+          console.log(`Received answer from ${senderId}`);
+          await pc.setRemoteDescription(new RTCSessionDescription(signal.sdp));
+          
+          // Apply queued candidates
+          if (pc.iceCandidatesQueue && pc.iceCandidatesQueue.length > 0) {
+            for (const cand of pc.iceCandidatesQueue) {
+              await pc.addIceCandidate(new RTCIceCandidate(cand));
+            }
+            pc.iceCandidatesQueue = [];
+          }
+        } else if (signal.type === 'candidate') {
+          console.log(`Received candidate from ${senderId}`);
+          if (pc.remoteDescription) {
+            await pc.addIceCandidate(new RTCIceCandidate(signal.candidate));
+          } else {
+            pc.iceCandidatesQueue.push(signal.candidate);
+          }
+        }
+      } catch (err) {
+        console.error("Error handling WebRTC signal: ", err);
+      }
+    };
+
+    socket.on('incomingVideoCallSignal', handleIncomingSignal);
+
+    return () => {
+      socket.off('incomingVideoCallSignal', handleIncomingSignal);
+      // Clean up connections
+      Object.keys(peerConnections.current).forEach(memberId => {
+        console.log(`Closing peer connection to ${memberId}`);
+        peerConnections.current[memberId].close();
+        delete peerConnections.current[memberId];
+      });
+      remoteStreams.current = {};
+      setRemoteVideoStreams({});
+    };
+  }, [socket, localStream, otherMembers]);
 
   // Whiteboard Drawing Logic
   React.useEffect(() => {
@@ -299,22 +443,40 @@ export default function VirtualRoom({ group, currentStudent, allStudents, socket
             // Simulated mic status (some muted, some speaking)
             const isMuted = member.id === 's3'; // quiet Marcus
             
-            return (
-              <div key={member.id} className={`video-tile ${isSpeaking ? 'speaking' : ''}`}>
-                <div className="video-tile-placeholder">
-                  <div className="video-avatar">
-                    {member.avatar}
-                  </div>
-                  {isSpeaking && (
-                    <div style={{ display: 'flex', gap: '3px', marginTop: '0.5rem' }}>
-                      <span className="wave-bar" style={{ animationDelay: '0.1s' }} />
-                      <span className="wave-bar" style={{ animationDelay: '0.3s' }} />
-                      <span className="wave-bar" style={{ animationDelay: '0.5s' }} />
-                    </div>
-                  )}
-                </div>
+            const hasRemoteStream = remoteVideoStreams[member.id] || remoteVideoStreams[String(member.id)];
+            const remoteStream = remoteVideoStreams[member.id] || remoteVideoStreams[String(member.id)];
 
-                <div className="video-tile-name">
+            return (
+              <div key={member.id} className={`video-tile ${isSpeaking ? 'speaking' : ''}`} style={{ overflow: 'hidden' }}>
+                {hasRemoteStream ? (
+                  <div className="video-tile-placeholder" style={{ padding: 0, overflow: 'hidden', position: 'relative', width: '100%', height: '100%' }}>
+                    <video 
+                      ref={el => {
+                        if (el && el.srcObject !== remoteStream) {
+                          el.srcObject = remoteStream;
+                        }
+                      }}
+                      autoPlay 
+                      playsInline 
+                      style={{ width: '100%', height: '100%', objectFit: 'cover' }} 
+                    />
+                  </div>
+                ) : (
+                  <div className="video-tile-placeholder">
+                    <div className="video-avatar">
+                      {member.avatar}
+                    </div>
+                    {isSpeaking && (
+                      <div style={{ display: 'flex', gap: '3px', marginTop: '0.5rem' }}>
+                        <span className="wave-bar" style={{ animationDelay: '0.1s' }} />
+                        <span className="wave-bar" style={{ animationDelay: '0.3s' }} />
+                        <span className="wave-bar" style={{ animationDelay: '0.5s' }} />
+                      </div>
+                    )}
+                  </div>
+                )}
+
+                <div className="video-tile-name" style={{ zIndex: 10 }}>
                   {isMuted ? (
                     <MicOff size={12} style={{ color: 'var(--danger)' }} />
                   ) : (

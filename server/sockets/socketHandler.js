@@ -67,6 +67,11 @@ export default function configureSockets(io) {
       io.to(`user-${receiverId}`).emit('incomingDirectMessage', message);
     });
 
+    // WebRTC signaling for peer-to-peer video calls
+    socket.on('videoCallSignal', ({ targetId, signal, senderId }) => {
+      io.to(`user-${targetId}`).emit('incomingVideoCallSignal', { senderId, signal });
+    });
+
     socket.on('disconnect', () => {
       console.log(`Socket client disconnected: ${socket.id}`);
     });
