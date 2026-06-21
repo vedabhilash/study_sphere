@@ -97,7 +97,7 @@ export default function GoalTracker({ group, onAddGoal, onToggleSubtask, onDelet
             const isFinished = progressPercent === 100 && totalTasks > 0;
 
             return (
-              <div key={goal.id} className="glass-card goal-card" style={{ 
+              <div key={goal.id || goal._id || goal.title} className="glass-card goal-card" style={{ 
                 borderLeft: isFinished ? '4px solid var(--success)' : '1px solid var(--border-glass)' 
               }}>
                 <div className="goal-header">
@@ -116,7 +116,7 @@ export default function GoalTracker({ group, onAddGoal, onToggleSubtask, onDelet
                   </div>
                   
                   <button 
-                    onClick={() => onDeleteGoal(group.id, goal.id)}
+                    onClick={() => onDeleteGoal(group.id, goal.id || goal._id)}
                     className="btn btn-secondary btn-icon"
                     style={{ background: 'transparent', border: 'none', color: 'var(--text-muted)' }}
                     title="Delete Goal"
@@ -141,8 +141,8 @@ export default function GoalTracker({ group, onAddGoal, onToggleSubtask, onDelet
                 <div className="subtasks-list">
                   {goal.subtasks.map(sub => (
                     <div 
-                      key={sub.id} 
-                      onClick={() => onToggleSubtask(group.id, goal.id, sub.id)}
+                      key={sub.id || sub._id || sub.title} 
+                      onClick={() => onToggleSubtask(group.id, goal.id || goal._id, sub.id || sub._id)}
                       className={`subtask-item ${sub.completed ? 'completed' : ''}`}
                     >
                       {sub.completed ? (
