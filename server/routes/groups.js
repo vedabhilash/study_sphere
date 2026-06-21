@@ -93,7 +93,12 @@ router.post('/:id/join', verifyToken, async (req, res) => {
     });
 
     const saved = await group.save();
-    res.json(formatGroup(saved));
+    const formatted = formatGroup(saved);
+    const io = req.app.get('socketio');
+    if (io) {
+      io.to(group._id.toString()).emit('groupUpdated', formatted);
+    }
+    res.json(formatted);
   } catch (error) {
     console.error(error);
     res.status(500).json({ message: 'Server error joining group' });
@@ -123,7 +128,12 @@ router.post('/:id/leave', verifyToken, async (req, res) => {
     });
 
     const saved = await group.save();
-    res.json(formatGroup(saved));
+    const formatted = formatGroup(saved);
+    const io = req.app.get('socketio');
+    if (io) {
+      io.to(group._id.toString()).emit('groupUpdated', formatted);
+    }
+    res.json(formatted);
   } catch (error) {
     console.error(error);
     res.status(500).json({ message: 'Server error leaving group' });
@@ -156,7 +166,12 @@ router.post('/:id/invite', verifyToken, async (req, res) => {
     });
 
     const saved = await group.save();
-    res.json(formatGroup(saved));
+    const formatted = formatGroup(saved);
+    const io = req.app.get('socketio');
+    if (io) {
+      io.to(group._id.toString()).emit('groupUpdated', formatted);
+    }
+    res.json(formatted);
   } catch (error) {
     console.error(error);
     res.status(500).json({ message: 'Server error during invitation' });
@@ -182,7 +197,12 @@ router.post('/:id/meetings', verifyToken, async (req, res) => {
 
     group.meetings.push(meeting);
     const saved = await group.save();
-    res.status(201).json(formatGroup(saved));
+    const formatted = formatGroup(saved);
+    const io = req.app.get('socketio');
+    if (io) {
+      io.to(group._id.toString()).emit('groupUpdated', formatted);
+    }
+    res.status(201).json(formatted);
   } catch (error) {
     console.error(error);
     res.status(500).json({ message: 'Server error scheduling session' });
@@ -211,7 +231,12 @@ router.post('/:id/resources', verifyToken, async (req, res) => {
 
     group.resources.push(resource);
     const saved = await group.save();
-    res.status(201).json(formatGroup(saved));
+    const formatted = formatGroup(saved);
+    const io = req.app.get('socketio');
+    if (io) {
+      io.to(group._id.toString()).emit('groupUpdated', formatted);
+    }
+    res.status(201).json(formatted);
   } catch (error) {
     console.error(error);
     res.status(500).json({ message: 'Server error adding resource' });
@@ -230,7 +255,12 @@ router.post('/:id/resources/:resId/upvote', verifyToken, async (req, res) => {
 
     resource.upvotes += 1;
     const saved = await group.save();
-    res.json(formatGroup(saved));
+    const formatted = formatGroup(saved);
+    const io = req.app.get('socketio');
+    if (io) {
+      io.to(group._id.toString()).emit('groupUpdated', formatted);
+    }
+    res.json(formatted);
   } catch (error) {
     console.error(error);
     res.status(500).json({ message: 'Server error upvoting resource' });
@@ -253,7 +283,12 @@ router.post('/:id/goals', verifyToken, async (req, res) => {
 
     group.goals.push(goal);
     const saved = await group.save();
-    res.status(201).json(formatGroup(saved));
+    const formatted = formatGroup(saved);
+    const io = req.app.get('socketio');
+    if (io) {
+      io.to(group._id.toString()).emit('groupUpdated', formatted);
+    }
+    res.status(201).json(formatted);
   } catch (error) {
     console.error(error);
     res.status(500).json({ message: 'Server error adding study goal' });
@@ -279,7 +314,12 @@ router.post('/:id/goals/:goalId/subtasks/:subId/toggle', verifyToken, async (req
     goal.completed = goal.subtasks.every(s => s.completed);
 
     const saved = await group.save();
-    res.json(formatGroup(saved));
+    const formatted = formatGroup(saved);
+    const io = req.app.get('socketio');
+    if (io) {
+      io.to(group._id.toString()).emit('groupUpdated', formatted);
+    }
+    res.json(formatted);
   } catch (error) {
     console.error(error);
     res.status(500).json({ message: 'Server error toggling subtask' });
@@ -295,7 +335,12 @@ router.delete('/:id/goals/:goalId', verifyToken, async (req, res) => {
 
     group.goals = group.goals.filter(goal => goal._id.toString() !== req.params.goalId);
     const saved = await group.save();
-    res.json(formatGroup(saved));
+    const formatted = formatGroup(saved);
+    const io = req.app.get('socketio');
+    if (io) {
+      io.to(group._id.toString()).emit('groupUpdated', formatted);
+    }
+    res.json(formatted);
   } catch (error) {
     console.error(error);
     res.status(500).json({ message: 'Server error deleting goal' });

@@ -90,6 +90,13 @@ export default function App() {
         socket.emit('registerUser', { userId: currentStudent.id });
       });
 
+      // Listen for group metadata updates (members, goals, meetings, resources)
+      socket.on('groupUpdated', (updatedGroup) => {
+        setGroups(prev => 
+          prev.map(g => g.id === updatedGroup.id ? updatedGroup : g)
+        );
+      });
+
       // Listen for group message broadcasts
       socket.on('messageReceived', ({ groupId, message }) => {
         setGroups(prev => 

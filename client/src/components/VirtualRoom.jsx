@@ -22,8 +22,8 @@ export default function VirtualRoom({ group, currentStudent, allStudents, socket
   // Get other group members
   const otherMembers = React.useMemo(() => {
     return group.members
-      .filter(id => id !== currentStudent.id)
-      .map(id => allStudents.find(s => s.id === id))
+      .filter(id => String(id) !== String(currentStudent.id))
+      .map(id => allStudents.find(s => String(s.id) === String(id)))
       .filter(Boolean);
   }, [group.members, allStudents, currentStudent.id]);
 
