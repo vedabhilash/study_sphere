@@ -8,6 +8,11 @@ export default function VirtualRoom({ group, currentStudent, allStudents, socket
   const [sharingScreen, setSharingScreen] = React.useState(false);
   const [activeSpeaker, setActiveSpeaker] = React.useState(null);
 
+  const localVideoRef = React.useRef(null);
+  const screenVideoRef = React.useRef(null);
+  const [localStream, setLocalStream] = React.useState(null);
+  const [screenStream, setScreenStream] = React.useState(null);
+
   // Whiteboard Canvas States
   const canvasRef = React.useRef(null);
   const [isDrawing, setIsDrawing] = React.useState(false);
@@ -39,6 +44,85 @@ export default function VirtualRoom({ group, currentStudent, allStudents, socket
 
     return () => clearInterval(interval);
   }, [otherMembers, currentStudent.name]);
+
+  // Handle local camera stream
+  React.useEffect(() => {
+    let activeStream = null;
+
+    async function startCamera() {
+      if (videoOn && !sharingScreen) {
+        try {
+          const stream = await navigator.mediaDevices.getUserMedia({ video: true, audio: false });
+          setLocalStream(stream);
+          activeStream = stream;
+          if (localVideoRef.current) {
+            localVideoRef.current.srcObject = stream;
+          }
+        } catch (err) {
+          console.error("Error accessing camera: ", err);
+        }
+      } else {
+        setLocalStream(null);
+      }
+    }
+
+    startCamera();
+
+    return () => {
+      if (activeStream) {
+        activeStream.getTracks().forEach(track => track.stop());
+      }
+    };
+  }, [videoOn, sharingScreen]);
+
+  // Bind local stream to video element when it changes
+  React.useEffect(() => {
+    if (localStream && localVideoRef.current && !localVideoRef.current.srcObject) {
+      localVideoRef.current.srcObject = localStream;
+    }
+  }, [localStream, videoOn, sharingScreen]);
+
+  // Handle local screen sharing stream
+  React.useEffect(() => {
+    let activeStream = null;
+
+    async function startScreenShare() {
+      if (sharingScreen) {
+        try {
+          const stream = await navigator.mediaDevices.getDisplayMedia({ video: true });
+          setScreenStream(stream);
+          activeStream = stream;
+          if (screenVideoRef.current) {
+            screenVideoRef.current.srcObject = stream;
+          }
+          // Listen for stop sharing from browser UI
+          stream.getVideoTracks()[0].onended = () => {
+            setSharingScreen(false);
+          };
+        } catch (err) {
+          console.error("Error sharing screen: ", err);
+          setSharingScreen(false);
+        }
+      } else {
+        setScreenStream(null);
+      }
+    }
+
+    startScreenShare();
+
+    return () => {
+      if (activeStream) {
+        activeStream.getTracks().forEach(track => track.stop());
+      }
+    };
+  }, [sharingScreen]);
+
+  // Bind screen stream to video element when it becomes active
+  React.useEffect(() => {
+    if (screenStream && screenVideoRef.current && !screenVideoRef.current.srcObject) {
+      screenVideoRef.current.srcObject = screenStream;
+    }
+  }, [screenStream, sharingScreen]);
 
   // Whiteboard Drawing Logic
   React.useEffect(() => {
@@ -162,14 +246,14 @@ export default function VirtualRoom({ group, currentStudent, allStudents, socket
           
           {/* Main Content Area: Screen Share or User Video */}
           {sharingScreen ? (
-            <div className="video-tile" style={{ gridColumn: 'span 2', background: '#090d16' }}>
-              <div className="screen-share-overlay">
-                <Monitor size={36} style={{ color: 'var(--success)', marginBottom: '0.75rem' }} />
-                <span>You are sharing your screen</span>
-                <span style={{ fontSize: '0.75rem', color: 'var(--text-secondary)' }}>
-                  Members are viewing your desk workspace (MATH 201 Practice Sheet.pdf)
-                </span>
-              </div>
+            <div className="video-tile" style={{ gridColumn: 'span 2', background: '#090d16', padding: 0, overflow: 'hidden', position: 'relative' }}>
+              <video 
+                ref={screenVideoRef}
+                autoPlay 
+                playsInline 
+                muted 
+                style={{ width: '100%', height: '100%', objectFit: 'contain' }} 
+              />
               <div className="video-tile-name">
                 <span className="status-dot online" />
                 <span>Your Screen Share</span>
@@ -177,13 +261,19 @@ export default function VirtualRoom({ group, currentStudent, allStudents, socket
             </div>
           ) : (
             /* User Video Tile */
-            <div className={`video-tile ${activeSpeaker === currentStudent.name ? 'speaking' : ''}`}>
+            <div className={`video-tile ${activeSpeaker === currentStudent.name ? 'speaking' : ''}`} style={{ overflow: 'hidden' }}>
               {videoOn ? (
-                <div className="video-tile-placeholder">
-                  <div className="video-avatar">
-                    {currentStudent.avatar}
+                <div className="video-tile-placeholder" style={{ padding: 0, overflow: 'hidden', position: 'relative', width: '100%', height: '100%' }}>
+                  <video 
+                    ref={localVideoRef}
+                    autoPlay 
+                    playsInline 
+                    muted 
+                    style={{ width: '100%', height: '100%', objectFit: 'cover' }} 
+                  />
+                  <div style={{ position: 'absolute', bottom: '2rem', right: '0.5rem', background: 'rgba(0,0,0,0.6)', padding: '0.2rem 0.5rem', borderRadius: '4px', fontSize: '0.7rem', color: 'white', zIndex: 5 }}>
+                    Camera Active
                   </div>
-                  <span style={{ fontSize: '0.85rem' }}>Camera Active</span>
                 </div>
               ) : (
                 <div className="video-tile-placeholder" style={{ opacity: 0.5 }}>
@@ -192,7 +282,7 @@ export default function VirtualRoom({ group, currentStudent, allStudents, socket
                 </div>
               )}
               
-              <div className="video-tile-name">
+              <div className="video-tile-name" style={{ zIndex: 10 }}>
                 {micOn ? (
                   <Mic size={12} style={{ color: 'var(--success)' }} />
                 ) : (
