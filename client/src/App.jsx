@@ -90,6 +90,11 @@ export default function App() {
         socket.emit('registerUser', { userId: currentStudent.id });
       });
 
+      if (socket.connected) {
+        console.log('Socket channel already active on mount:', socket.id);
+        socket.emit('registerUser', { userId: currentStudent.id });
+      }
+
       // Listen for group metadata updates (members, goals, meetings, resources)
       socket.on('groupUpdated', (updatedGroup) => {
         setGroups(prev => 

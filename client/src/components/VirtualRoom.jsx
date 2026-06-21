@@ -131,7 +131,7 @@ export default function VirtualRoom({ group, currentStudent, allStudents, socket
 
   // WebRTC Peer Connection Manager
   React.useEffect(() => {
-    if (!socket || !localStream) return;
+    if (!socket) return;
 
     const myId = currentStudent.id;
 
@@ -152,10 +152,12 @@ export default function VirtualRoom({ group, currentStudent, allStudents, socket
       // Track candidate queue
       pc.iceCandidatesQueue = [];
 
-      // Add local stream tracks to this peer connection
-      localStream.getTracks().forEach(track => {
-        pc.addTrack(track, localStream);
-      });
+      // Add local stream tracks to this peer connection if available
+      if (localStream) {
+        localStream.getTracks().forEach(track => {
+          pc.addTrack(track, localStream);
+        });
+      }
 
       // Handle ICE candidates
       pc.onicecandidate = (event) => {
@@ -182,6 +184,19 @@ export default function VirtualRoom({ group, currentStudent, allStudents, socket
       return pc;
     }
 
+    // Send reconnect request to members with smaller ID so they initiate a new call
+    otherMembers.forEach(member => {
+      const memberId = member.id;
+      if (String(myId) > String(memberId)) {
+        console.log(`Requesting smaller ID member ${memberId} to initiate WebRTC call`);
+        socket.emit('videoCallSignal', {
+          targetId: memberId,
+          senderId: myId,
+          signal: { type: 'reconnect' }
+        });
+      }
+    });
+
     // Alphabetically smaller ID initiates the call
     otherMembers.forEach(async (member) => {
       const memberId = member.id;
@@ -207,11 +222,41 @@ export default function VirtualRoom({ group, currentStudent, allStudents, socket
     const handleIncomingSignal = async ({ senderId, signal }) => {
       if (!otherMembers.some(m => String(m.id) === String(senderId))) return;
 
-      const pc = getOrCreatePeerConnection(senderId);
-
       try {
+        if (signal.type === 'reconnect') {
+          console.log(`Received reconnect request from ${senderId}`);
+          if (peerConnections.current[senderId]) {
+            console.log(`Closing existing peer connection for ${senderId} due to reconnect request`);
+            peerConnections.current[senderId].close();
+            delete peerConnections.current[senderId];
+          }
+          
+          // Initiate call to the sender since we received a reconnect request
+          if (String(myId) < String(senderId)) {
+            console.log(`Initiating call to ${senderId} after reconnect request`);
+            const pc = getOrCreatePeerConnection(senderId);
+            const offer = await pc.createOffer();
+            await pc.setLocalDescription(offer);
+            socket.emit('videoCallSignal', {
+              targetId: senderId,
+              senderId: myId,
+              signal: { type: 'offer', sdp: offer }
+            });
+          }
+          return;
+        }
+
         if (signal.type === 'offer') {
           console.log(`Received offer from ${senderId}`);
+          
+          // Reset existing connection if present to avoid stale state
+          if (peerConnections.current[senderId]) {
+            console.log(`Closing existing peer connection for ${senderId} due to incoming offer`);
+            peerConnections.current[senderId].close();
+            delete peerConnections.current[senderId];
+          }
+
+          const pc = getOrCreatePeerConnection(senderId);
           await pc.setRemoteDescription(new RTCSessionDescription(signal.sdp));
           
           // Apply queued candidates
@@ -229,23 +274,28 @@ export default function VirtualRoom({ group, currentStudent, allStudents, socket
             senderId: myId,
             signal: { type: 'answer', sdp: answer }
           });
-        } else if (signal.type === 'answer') {
-          console.log(`Received answer from ${senderId}`);
-          await pc.setRemoteDescription(new RTCSessionDescription(signal.sdp));
-          
-          // Apply queued candidates
-          if (pc.iceCandidatesQueue && pc.iceCandidatesQueue.length > 0) {
-            for (const cand of pc.iceCandidatesQueue) {
-              await pc.addIceCandidate(new RTCIceCandidate(cand));
+        } else {
+          // answer or candidate signal requires connection to exist
+          const pc = getOrCreatePeerConnection(senderId);
+
+          if (signal.type === 'answer') {
+            console.log(`Received answer from ${senderId}`);
+            await pc.setRemoteDescription(new RTCSessionDescription(signal.sdp));
+            
+            // Apply queued candidates
+            if (pc.iceCandidatesQueue && pc.iceCandidatesQueue.length > 0) {
+              for (const cand of pc.iceCandidatesQueue) {
+                await pc.addIceCandidate(new RTCIceCandidate(cand));
+              }
+              pc.iceCandidatesQueue = [];
             }
-            pc.iceCandidatesQueue = [];
-          }
-        } else if (signal.type === 'candidate') {
-          console.log(`Received candidate from ${senderId}`);
-          if (pc.remoteDescription) {
-            await pc.addIceCandidate(new RTCIceCandidate(signal.candidate));
-          } else {
-            pc.iceCandidatesQueue.push(signal.candidate);
+          } else if (signal.type === 'candidate') {
+            console.log(`Received candidate from ${senderId}`);
+            if (pc.remoteDescription) {
+              await pc.addIceCandidate(new RTCIceCandidate(signal.candidate));
+            } else {
+              pc.iceCandidatesQueue.push(signal.candidate);
+            }
           }
         }
       } catch (err) {
