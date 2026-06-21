@@ -13,6 +13,8 @@ function getHeaders(extraHeaders = {}) {
   return headers;
 }
 
+const API_BASE_URL = import.meta.env.VITE_API_URL || '';
+
 // Request Helper
 async function request(url, options = {}) {
   const config = {
@@ -20,7 +22,8 @@ async function request(url, options = {}) {
     headers: getHeaders(options.headers)
   };
 
-  const response = await fetch(url, config);
+  const fullUrl = url.startsWith('/') ? `${API_BASE_URL}${url}` : url;
+  const response = await fetch(fullUrl, config);
   const data = await response.json();
 
   if (!response.ok) {

@@ -52,8 +52,9 @@ export default function App() {
   // Initialize socket when authenticated
   React.useEffect(() => {
     if (isAuthenticated && currentStudent) {
-      // Connect to Socket server (Vite proxies this automatically)
-      socket = io();
+      // Connect to Socket server
+      const API_BASE_URL = import.meta.env.VITE_API_URL || '';
+      socket = io(API_BASE_URL);
 
       socket.on('connect', () => {
         console.log('Socket channel active:', socket.id);
