@@ -126,7 +126,7 @@ export default function App() {
       // Listen for private direct messages
       socket.on('incomingDirectMessage', (message) => {
         const senderId = message.senderId;
-        if (quickChatStudentRef.current && quickChatStudentRef.current.id === senderId) {
+        if (quickChatStudentRef.current && String(quickChatStudentRef.current.id) === String(senderId)) {
           setQuickChatHistory(prev => [...prev, message]);
         } else {
           setNotifications(prev => ({
