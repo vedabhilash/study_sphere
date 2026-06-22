@@ -82,10 +82,10 @@ export default function VirtualRoom({ group, currentStudent, allStudents, socket
 
   // Bind local stream to video element when it changes
   React.useEffect(() => {
-    if (localStream && localVideoRef.current && !localVideoRef.current.srcObject) {
+    if (localVideoRef.current) {
       localVideoRef.current.srcObject = localStream;
     }
-  }, [localStream, videoOn, sharingScreen]);
+  }, [localStream]);
 
   // Handle local screen sharing stream
   React.useEffect(() => {
@@ -124,16 +124,17 @@ export default function VirtualRoom({ group, currentStudent, allStudents, socket
 
   // Bind screen stream to video element when it becomes active
   React.useEffect(() => {
-    if (screenStream && screenVideoRef.current && !screenVideoRef.current.srcObject) {
+    if (screenVideoRef.current) {
       screenVideoRef.current.srcObject = screenStream;
     }
-  }, [screenStream, sharingScreen]);
+  }, [screenStream]);
 
   // WebRTC Peer Connection Manager
   React.useEffect(() => {
     if (!socket) return;
 
     const myId = currentStudent.id;
+    const currentActiveStream = sharingScreen ? screenStream : localStream;
 
     // Helper to get or create RTCPeerConnection for a member
     function getOrCreatePeerConnection(memberId) {
@@ -152,10 +153,10 @@ export default function VirtualRoom({ group, currentStudent, allStudents, socket
       // Track candidate queue
       pc.iceCandidatesQueue = [];
 
-      // Add local stream tracks to this peer connection if available
-      if (localStream) {
-        localStream.getTracks().forEach(track => {
-          pc.addTrack(track, localStream);
+      // Add active stream tracks to this peer connection if available
+      if (currentActiveStream) {
+        currentActiveStream.getTracks().forEach(track => {
+          pc.addTrack(track, currentActiveStream);
         });
       }
 
@@ -172,11 +173,12 @@ export default function VirtualRoom({ group, currentStudent, allStudents, socket
 
       // Handle remote tracks
       pc.ontrack = (event) => {
-        console.log(`Received remote track from ${memberId}:`, event.streams[0]);
-        remoteStreams.current[memberId] = event.streams[0];
+        console.log(`Received remote track from ${memberId}:`, event.streams);
+        const stream = event.streams[0] || new MediaStream([event.track]);
+        remoteStreams.current[memberId] = stream;
         setRemoteVideoStreams(prev => ({
           ...prev,
-          [memberId]: event.streams[0]
+          [memberId]: stream
         }));
       };
 
@@ -249,14 +251,20 @@ export default function VirtualRoom({ group, currentStudent, allStudents, socket
         if (signal.type === 'offer') {
           console.log(`Received offer from ${senderId}`);
           
-          // Reset existing connection if present to avoid stale state
-          if (peerConnections.current[senderId]) {
-            console.log(`Closing existing peer connection for ${senderId} due to incoming offer`);
-            peerConnections.current[senderId].close();
+          // Reset existing connection ONLY if it has already been established (has a remote description).
+          // If it was just created (e.g., by a candidate signal) and doesn't have a remote description,
+          // do NOT close/delete it so we do not discard the queued ICE candidates.
+          let pc = peerConnections.current[senderId];
+          if (pc && pc.remoteDescription) {
+            console.log(`Closing existing configured peer connection for ${senderId} due to incoming offer`);
+            pc.close();
             delete peerConnections.current[senderId];
+            pc = null;
           }
 
-          const pc = getOrCreatePeerConnection(senderId);
+          if (!pc) {
+            pc = getOrCreatePeerConnection(senderId);
+          }
           await pc.setRemoteDescription(new RTCSessionDescription(signal.sdp));
           
           // Apply queued candidates
@@ -316,7 +324,7 @@ export default function VirtualRoom({ group, currentStudent, allStudents, socket
       remoteStreams.current = {};
       setRemoteVideoStreams({});
     };
-  }, [socket, localStream, otherMembers]);
+  }, [socket, localStream, screenStream, sharingScreen, otherMembers]);
 
   // Whiteboard Drawing Logic
   React.useEffect(() => {
