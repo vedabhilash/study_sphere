@@ -114,7 +114,7 @@ const toggleLikeResource = async (req, res) => {
       return res.status(404).json({ message: 'Resource not found' });
     }
 
-    const likeIndex = resource.likes.indexOf(req.user.id);
+    const likeIndex = resource.likes.findIndex(likeId => likeId.toString() === req.user.id);
     if (likeIndex > -1) {
       // Unlike
       resource.likes.splice(likeIndex, 1);

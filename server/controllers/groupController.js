@@ -120,7 +120,7 @@ const joinGroup = async (req, res) => {
     }
 
     // Check if user is already a member
-    const isMember = group.members.includes(req.user.id);
+    const isMember = group.members.some(memberId => memberId.toString() === req.user.id);
     if (isMember) {
       return res.status(400).json({ message: 'You are already a member of this group' });
     }
@@ -153,7 +153,7 @@ const leaveGroup = async (req, res) => {
     }
 
     // Check if user is member
-    const isMember = group.members.includes(req.user.id);
+    const isMember = group.members.some(memberId => memberId.toString() === req.user.id);
     if (!isMember) {
       return res.status(400).json({ message: 'You are not a member of this group' });
     }
@@ -207,7 +207,7 @@ const createSession = async (req, res) => {
     }
 
     // Verify user is member or admin
-    const isMember = group.members.includes(req.user.id);
+    const isMember = group.members.some(memberId => memberId.toString() === req.user.id);
     if (!isMember && group.admin.toString() !== req.user.id) {
       return res.status(403).json({ message: 'Not authorized to schedule sessions in this group' });
     }
@@ -247,7 +247,7 @@ const attendSession = async (req, res) => {
     }
 
     // Check if already attending
-    const attendeeIndex = session.attendees.indexOf(req.user.id);
+    const attendeeIndex = session.attendees.findIndex(attendeeId => attendeeId.toString() === req.user.id);
     if (attendeeIndex > -1) {
       // Remove attendance
       session.attendees.splice(attendeeIndex, 1);

@@ -20,8 +20,8 @@ export const SocketProvider = ({ children }) => {
     }
 
     // Connect to backend socket server
-    // Since we are proxying, we can connect to root or specify window.location.origin
-    const newSocket = io(window.location.origin, {
+    const backendUrl = import.meta.env.VITE_API_URL || window.location.origin;
+    const newSocket = io(backendUrl, {
       autoConnect: true,
       reconnection: true
     });
