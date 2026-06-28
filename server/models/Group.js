@@ -1,73 +1,67 @@
-import mongoose from 'mongoose';
+const mongoose = require('mongoose');
 
-const subtaskSchema = new mongoose.Schema({
-  title: { type: String, required: true },
-  completed: { type: Boolean, default: false }
-});
-
-const goalSchema = new mongoose.Schema({
-  title: { type: String, required: true },
-  completed: { type: Boolean, default: false },
-  subtasks: [subtaskSchema]
-});
-
-const meetingSchema = new mongoose.Schema({
-  title: { type: String, required: true },
-  date: { type: String, required: true },
-  time: { type: String, required: true },
-  duration: { type: Number, default: 60 },
-  location: { type: String, default: 'Virtual Room' },
-  attendees: [{ type: mongoose.Schema.Types.ObjectId, ref: 'User' }]
-});
-
-const resourceSchema = new mongoose.Schema({
-  title: { type: String, required: true },
-  type: { type: String, enum: ['link', 'note', 'problem'], required: true },
-  content: { type: String, required: true },
-  postedBy: { type: String, required: true },
-  upvotes: { type: Number, default: 0 },
-  category: { type: String, default: 'General Notes' }
-});
-
-const messageSchema = new mongoose.Schema({
-  senderId: { type: String, required: true }, // can be user ID or 'system'
-  senderName: { type: String, required: true },
-  content: { type: String, required: true },
-  timestamp: { type: String, required: true }
-});
+const sessionSchema = new mongoose.Schema({
+  title: {
+    type: String,
+    required: true,
+    trim: true
+  },
+  description: {
+    type: String,
+    trim: true
+  },
+  startTime: {
+    type: Date,
+    required: true
+  },
+  endTime: {
+    type: Date,
+    required: true
+  },
+  attendees: [{
+    type: mongoose.Schema.Types.ObjectId,
+    ref: 'User'
+  }]
+}, { timestamps: true });
 
 const groupSchema = new mongoose.Schema({
   name: {
     type: String,
-    required: true
-  },
-  course: {
-    type: String,
-    required: true
+    required: true,
+    trim: true
   },
   description: {
     type: String,
-    default: ''
+    trim: true
+  },
+  subject: {
+    type: String,
+    required: true,
+    trim: true
+  },
+  admin: {
+    type: mongoose.Schema.Types.ObjectId,
+    ref: 'User',
+    required: true
   },
   members: [{
     type: mongoose.Schema.Types.ObjectId,
     ref: 'User'
   }],
-  maxSize: {
-    type: Number,
-    default: 4
+  isPrivate: {
+    type: Boolean,
+    default: false
   },
-  studyStyle: {
+  inviteCode: {
     type: String,
-    default: 'discussion'
+    unique: true,
+    sparse: true // Allows nulls to be unique if public
   },
-  goals: [goalSchema],
-  meetings: [meetingSchema],
-  resources: [resourceSchema],
-  messages: [messageSchema]
-}, {
-  timestamps: true
-});
+  sessions: [sessionSchema],
+  resources: [{
+    type: mongoose.Schema.Types.ObjectId,
+    ref: 'Resource'
+  }]
+}, { timestamps: true });
 
-const Group = mongoose.model('Group', groupSchema);
-export default Group;
+module.exports = mongoose.model('Group', groupSchema);

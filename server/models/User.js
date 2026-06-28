@@ -1,9 +1,11 @@
-import mongoose from 'mongoose';
+const mongoose = require('mongoose');
+const bcrypt = require('bcryptjs');
 
 const userSchema = new mongoose.Schema({
   name: {
     type: String,
-    required: true
+    required: true,
+    trim: true
   },
   email: {
     type: String,
@@ -18,11 +20,19 @@ const userSchema = new mongoose.Schema({
   },
   avatar: {
     type: String,
-    default: 'ST'
+    default: ''
   },
-  major: {
+  academicMajor: {
     type: String,
-    default: 'Undeclared'
+    default: ''
+  },
+  yearOfStudy: {
+    type: String,
+    default: ''
+  },
+  university: {
+    type: String,
+    default: ''
   },
   bio: {
     type: String,
@@ -32,41 +42,67 @@ const userSchema = new mongoose.Schema({
     type: [String],
     default: []
   },
-  availability: {
-    type: mongoose.Schema.Types.Mixed,
-    default: {
-      'Monday': [], 'Tuesday': [], 'Wednesday': [], 'Thursday': [], 'Friday': [], 'Saturday': [], 'Sunday': []
-    }
+  preferredGroupSize: {
+    type: String,
+    default: ''
+  },
+  preferredStudyStyle: {
+    type: String,
+    default: ''
   },
   learningGoals: {
     type: [String],
     default: []
   },
-  groupSizePreference: {
-    type: Number,
-    default: 4
-  },
-  studyStyle: {
-    type: String,
-    default: 'discussion'
+  weeklyAvailability: {
+    type: mongoose.Schema.Types.Mixed,
+    default: {}
   },
   privacy: {
-    visibility: {
-      type: String,
-      default: 'public'
+    showProfileMatchFinder: {
+      type: Boolean,
+      default: true
     },
-    showSchedule: {
+    shareScheduleStudyPartners: {
+      type: Boolean,
+      default: true
+    },
+    allowStudyInvitations: {
+      type: Boolean,
+      default: true
+    },
+    showOnlineStatus: {
+      type: Boolean,
+      default: true
+    },
+    receiveNotifications: {
       type: Boolean,
       default: true
     }
   },
-  rating: {
-    type: Number,
-    default: 5.0
+  groupsJoined: [{
+    type: mongoose.Schema.Types.ObjectId,
+    ref: 'Group'
+  }],
+  createdAt: {
+    type: Date,
+    default: Date.now
   }
-}, {
-  timestamps: true
 });
 
-const User = mongoose.model('User', userSchema);
-export default User;
+// Match user entered password to hashed password
+userSchema.methods.matchPassword = async function (enteredPassword) {
+  return await bcrypt.compare(enteredPassword, this.password);
+};
+
+// Encrypt password before saving
+userSchema.pre('save', async function (next) {
+  if (!this.isModified('password')) {
+    return next();
+  }
+  const salt = await bcrypt.genSalt(10);
+  this.password = await bcrypt.hash(this.password, salt);
+  next();
+});
+
+module.exports = mongoose.model('User', userSchema);

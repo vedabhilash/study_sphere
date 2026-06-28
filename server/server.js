@@ -1,67 +1,59 @@
-import express from 'express';
-import http from 'http';
-import { Server } from 'socket.io';
-import mongoose from 'mongoose';
-import cors from 'cors';
-import dotenv from 'dotenv';
+require('dotenv').config();
+const express = require('express');
+const http = require('http');
+const socketio = require('socket.io');
+const cors = require('cors');
+const path = require('path');
+const connectDB = require('./config/db');
+const { socketHandler } = require('./socket/socketHandler');
 
-// Routes
-import authRoutes from './routes/auth.js';
-import userRoutes from './routes/users.js';
-import groupRoutes from './routes/groups.js';
-
-// Socket coordination
-import configureSockets from './sockets/socketHandler.js';
-
-// Database seeder
-import { seedDatabase } from './utils/seed.js';
-
-dotenv.config();
+// Connect to Database
+connectDB();
 
 const app = express();
 const server = http.createServer(app);
-const io = new Server(server, {
+
+// CORS configuration
+const corsOptions = {
+  origin: process.env.CLIENT_URL || 'http://localhost:5173',
+  credentials: true,
+  methods: ['GET', 'POST', 'PUT', 'DELETE', 'OPTIONS']
+};
+
+app.use(cors(corsOptions));
+app.use(express.json());
+app.use(express.urlencoded({ extended: true }));
+
+// Serve uploaded static files
+app.use('/uploads', express.static(path.join(__dirname, 'uploads')));
+
+// Routes
+app.use('/api/auth', require('./routes/authRoutes'));
+app.use('/api/groups', require('./routes/groupRoutes'));
+app.use('/api/resources', require('./routes/resourceRoutes'));
+
+// Root path check
+app.get('/api/health', (req, res) => {
+  res.status(200).json({ status: 'OK', message: 'Study Group API is fully functional' });
+});
+
+// Configure Socket.io
+const io = socketio(server, {
   cors: {
-    origin: '*',
-    methods: ['GET', 'POST', 'PUT', 'DELETE']
+    origin: process.env.CLIENT_URL || 'http://localhost:5173',
+    methods: ['GET', 'POST'],
+    credentials: true
   }
 });
 
+// Store io instance in app settings to make it accessible to REST controllers
 app.set('socketio', io);
 
-// Middleware
-app.use(cors());
-app.use(express.json());
+// Initialize Socket.io connection logic
+socketHandler(io);
 
-// API Routes
-app.use('/api/auth', authRoutes);
-app.use('/api/users', userRoutes);
-app.use('/api/groups', groupRoutes);
-
-// Root path diagnostic
-app.get('/health', (req, res) => {
-  res.json({ status: 'healthy', database: mongoose.connection.readyState === 1 ? 'connected' : 'disconnected' });
-});
-
-// Configure WebSocket Events
-configureSockets(io);
-
-// Database Connection
+// Define PORT and start
 const PORT = process.env.PORT || 5000;
-const MONGODB_URI = process.env.MONGODB_URI || 'mongodb://localhost:27017/studysphere';
-
-mongoose.connect(MONGODB_URI)
-  .then(async () => {
-    console.log('Successfully connected to MongoDB Database');
-    if (process.env.SEED_DB === 'true') {
-      await seedDatabase();
-    }
-    server.listen(PORT, () => {
-      console.log(`StudySphere Backend server running on port ${PORT}`);
-    });
-  })
-  .catch((error) => {
-    console.error('Failed to connect to MongoDB:', error.message);
-    console.log('Ensure your MongoDB database server is active and running.');
-    process.exit(1);
-  });
+server.listen(PORT, () => {
+  console.log(`Server running in mode on port ${PORT}`);
+});
