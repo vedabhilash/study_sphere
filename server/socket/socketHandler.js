@@ -63,6 +63,48 @@ const socketHandler = (io) => {
       }
     });
 
+    // WebRTC signaling for peer-to-peer video calls
+    socket.on('videoCallSignal', ({ targetId, signal, senderId }) => {
+      const receiverSocketId = onlineUsers.get(targetId);
+      if (receiverSocketId) {
+        io.to(receiverSocketId).emit('incomingVideoCallSignal', { senderId, signal });
+      }
+    });
+
+    // User joins meeting room
+    socket.on('joinMeeting', ({ groupId, student }) => {
+      socket.join(`${groupId}-meeting`);
+      socket.to(`${groupId}-meeting`).emit('meetingUserJoined', student);
+      console.log(`Meeting: ${student.name} joined room ${groupId}-meeting`);
+    });
+
+    // User leaves meeting room
+    socket.on('leaveMeeting', ({ groupId, studentId }) => {
+      socket.leave(`${groupId}-meeting`);
+      socket.to(`${groupId}-meeting`).emit('meetingUserLeft', studentId);
+      console.log(`Meeting: ${studentId} left room ${groupId}-meeting`);
+    });
+
+    // Broadcast status updates (camera, microphone, speaking, raised hand)
+    socket.on('meetingStatusUpdate', ({ groupId, studentId, status }) => {
+      socket.to(`${groupId}-meeting`).emit('meetingStatusUpdate', { studentId, status });
+    });
+
+    // Relay emoji reactions
+    socket.on('sendEmojiReaction', ({ groupId, studentId, emoji }) => {
+      io.to(`${groupId}-meeting`).emit('incomingEmojiReaction', { studentId, emoji });
+    });
+
+    // Send in-meeting message
+    socket.on('sendMeetingMessage', ({ groupId, message }) => {
+      io.to(`${groupId}-meeting`).emit('receiveMeetingMessage', message);
+    });
+
+    // Host control commands (mute, remove, lock, end meeting)
+    socket.on('meetingControl', ({ groupId, command, targetId, value }) => {
+      io.to(`${groupId}-meeting`).emit('incomingMeetingControl', { command, targetId, value });
+    });
+
     // Disconnect
     socket.on('disconnect', () => {
       console.log(`User disconnected: ${socket.id}`);
@@ -74,6 +116,9 @@ const socketHandler = (io) => {
           userId: socket.userId,
           status: 'offline'
         });
+
+        // Broadcast offline status to active meetings
+        io.emit('meetingUserOffline', socket.userId);
       }
     });
   });

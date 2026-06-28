@@ -23,9 +23,11 @@ import {
   Loader, 
   ExternalLink,
   ChevronRight,
-  Search
+  Search,
+  Video
 } from 'lucide-react';
 import './GroupDetailsPage.css';
+import VirtualRoom from '../components/VirtualRoom';
 
 const getFullUrl = (url) => {
   if (!url) return '';
@@ -446,6 +448,13 @@ const GroupDetailsPage = () => {
               <Calendar size={18} />
               <span>Session Scheduler</span>
             </button>
+            <button 
+              className={`group-tab-btn ${activeTab === 'virtual' ? 'active' : ''}`}
+              onClick={() => setSearchParams({ tab: 'virtual' })}
+            >
+              <Video size={18} />
+              <span>Virtual Room</span>
+            </button>
           </div>
 
           {/* Tab Content Panel */}
@@ -714,6 +723,16 @@ const GroupDetailsPage = () => {
                   </div>
                 )}
               </div>
+            )}
+
+            {/* TABS 4: VIRTUAL ROOM */}
+            {activeTab === 'virtual' && (
+              <VirtualRoom 
+                group={group} 
+                currentStudent={{ id: user._id, name: user.name, avatar: getFullUrl(user.avatar) }} 
+                allStudents={group.members.map(m => ({ id: m._id, name: m.name, avatar: getFullUrl(m.avatar) }))} 
+                socket={socket} 
+              />
             )}
 
           </div>
