@@ -85,7 +85,7 @@ const Dashboard = () => {
 
   if (!user) return null;
 
-  const totalMembers = user.groupsJoined.reduce((sum, group) => sum + (group.members?.length || 0), 0);
+  const totalMembers = (user.groupsJoined || []).reduce((sum, group) => sum + (group.members?.length || 0), 0);
 
   return (
     <div className="main-content animate-fade-in">
@@ -159,7 +159,7 @@ const Dashboard = () => {
                 </div>
               ) : (
                 <div className="my-groups-grid">
-                  {user.groupsJoined.map((group) => (
+                  {(user.groupsJoined || []).map((group) => (
                     <div key={group._id} className="dashboard-group-card">
                       <div>
                         <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start' }}>
