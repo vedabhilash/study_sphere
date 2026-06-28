@@ -27,6 +27,12 @@ import {
 } from 'lucide-react';
 import './GroupDetailsPage.css';
 
+const getFullUrl = (url) => {
+  if (!url) return '';
+  if (url.startsWith('http://') || url.startsWith('https://')) return url;
+  return `${import.meta.env.VITE_API_URL || ''}${url}`;
+};
+
 const GroupDetailsPage = () => {
   const { id } = useParams();
   const navigate = useNavigate();
@@ -459,7 +465,7 @@ const GroupDetailsPage = () => {
                     messages.map((msg) => {
                       const isMe = msg.sender?._id === user._id || msg.sender === user._id;
                       const senderName = isMe ? 'You' : (msg.sender?.name || 'User');
-                      const senderAvatar = isMe ? user.avatar : (msg.sender?.avatar || 'https://via.placeholder.com/150');
+                      const senderAvatar = getFullUrl(isMe ? user.avatar : (msg.sender?.avatar || 'https://via.placeholder.com/150'));
                       return (
                         <div key={msg._id} className={`chat-bubble-container ${isMe ? 'me' : ''}`}>
                           <img src={senderAvatar} alt={senderName} className="chat-bubble-avatar" />
@@ -478,7 +484,7 @@ const GroupDetailsPage = () => {
                                     {msg.fileName || 'Attachment'}
                                   </span>
                                   <a 
-                                    href={msg.fileUrl} 
+                                    href={getFullUrl(msg.fileUrl)} 
                                     target="_blank" 
                                     rel="noreferrer" 
                                     className="chat-attachment-link"
@@ -622,7 +628,7 @@ const GroupDetailsPage = () => {
                               )}
                               
                               <a 
-                                href={res.fileUrl} 
+                                href={getFullUrl(res.fileUrl)} 
                                 target="_blank" 
                                 rel="noreferrer" 
                                 className="btn btn-secondary" 

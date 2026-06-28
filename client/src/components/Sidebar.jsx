@@ -37,7 +37,11 @@ const Sidebar = ({ isOpen, onClose }) => {
 
   // Get user avatar or first letter for initial avatar fallback
   const getAvatarSource = () => {
-    if (user.avatar) return user.avatar;
+    if (user.avatar) {
+      const avatar = user.avatar;
+      if (avatar.startsWith('http://') || avatar.startsWith('https://')) return avatar;
+      return `${import.meta.env.VITE_API_URL || ''}${avatar}`;
+    }
     return null;
   };
 

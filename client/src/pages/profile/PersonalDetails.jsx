@@ -5,6 +5,12 @@ import { Link } from 'react-router-dom';
 import { Upload, CheckCircle, AlertCircle, Loader } from 'lucide-react';
 import './Profile.css';
 
+const getFullUrl = (url) => {
+  if (!url) return '';
+  if (url.startsWith('http://') || url.startsWith('https://')) return url;
+  return `${import.meta.env.VITE_API_URL || ''}${url}`;
+};
+
 const PersonalDetails = () => {
   const { user, refreshUser } = useAuth();
 
@@ -123,7 +129,7 @@ const PersonalDetails = () => {
         <div className="avatar-section">
           <div className="avatar-preview-container">
             {user?.avatar ? (
-              <img src={user.avatar} alt={name} className="avatar-img" />
+              <img src={getFullUrl(user.avatar)} alt={name} className="avatar-img" />
             ) : (
               <div className="avatar-placeholder">{getInitials()}</div>
             )}
