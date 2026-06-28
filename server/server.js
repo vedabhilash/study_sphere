@@ -14,8 +14,23 @@ const app = express();
 const server = http.createServer(app);
 
 // CORS configuration
+const allowedOrigins = [
+  'http://localhost:5173',
+  'https://study-sphere-lemon-seven.vercel.app'
+];
+if (process.env.CLIENT_URL) {
+  allowedOrigins.push(process.env.CLIENT_URL);
+}
+
 const corsOptions = {
-  origin: process.env.CLIENT_URL || 'http://localhost:5173',
+  origin: (origin, callback) => {
+    if (!origin) return callback(null, true);
+    if (allowedOrigins.includes(origin)) {
+      callback(null, true);
+    } else {
+      callback(new Error('Not allowed by CORS'));
+    }
+  },
   credentials: true,
   methods: ['GET', 'POST', 'PUT', 'DELETE', 'OPTIONS']
 };
@@ -40,7 +55,7 @@ app.get('/api/health', (req, res) => {
 // Configure Socket.io
 const io = socketio(server, {
   cors: {
-    origin: process.env.CLIENT_URL || 'http://localhost:5173',
+    origin: allowedOrigins,
     methods: ['GET', 'POST'],
     credentials: true
   }
