@@ -484,13 +484,11 @@ export default function VirtualRoom({ group, currentStudent, allStudents, socket
     // Trigger initial WebRTC handshake requests
     Object.keys(participants).forEach(peerId => {
       if (peerId !== myId) {
-        if (String(myId) > String(peerId)) {
-          socket.emit('videoCallSignal', {
-            targetId: peerId,
-            senderId: myId,
-            signal: { type: 'reconnect' }
-          });
-        }
+        socket.emit('videoCallSignal', {
+          targetId: peerId,
+          senderId: myId,
+          signal: { type: 'reconnect' }
+        });
       }
     });
 
