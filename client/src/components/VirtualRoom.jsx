@@ -445,38 +445,50 @@ export default function VirtualRoom({ group, currentStudent, allStudents, socket
     }
   };
 
+  // Stable refs so WebRTC callbacks always see latest values without re-running the effect
+  const localStreamRef = useRef(null);
+  const sharingScreenRef = useRef(false);
+  const screenStreamRef = useRef(null);
+  const myIdRef = useRef(currentStudent.id);
+  const groupIdRef = useRef(group.id);
+  const studentsMapRef = useRef(studentsMap);
+  const micOnRef = useRef(micOn);
+  const videoOnRef = useRef(videoOn);
+  const raisedHandRef = useRef(raisedHand);
+  const currentStudentRef = useRef(currentStudent);
+
+  // Keep all refs in sync with latest state
+  useEffect(() => { localStreamRef.current = localStream; }, [localStream]);
+  useEffect(() => { sharingScreenRef.current = sharingScreen; }, [sharingScreen]);
+  useEffect(() => { screenStreamRef.current = screenStream; }, [screenStream]);
+  useEffect(() => { studentsMapRef.current = studentsMap; }, [studentsMap]);
+  useEffect(() => { micOnRef.current = micOn; }, [micOn]);
+  useEffect(() => { videoOnRef.current = videoOn; }, [videoOn]);
+  useEffect(() => { raisedHandRef.current = raisedHand; }, [raisedHand]);
+  useEffect(() => { currentStudentRef.current = currentStudent; }, [currentStudent]);
+
   // WebRTC Peer Connection and Socket listener bindings
+  // ONLY depends on socket + joined — never re-runs on state/stream changes
   useEffect(() => {
     if (!socket || !joined) return;
 
-    const myId = currentStudent.id;
-    const currentActiveStream = sharingScreen ? screenStream : localStream;
+    const myId = myIdRef.current;
 
-    // Relays local tracks to RTCPeerConnection
-    const updatePeerTracks = (pc) => {
-      const senders = pc.getSenders();
-      senders.forEach(sender => pc.removeTrack(sender));
-      if (currentActiveStream) {
-        currentActiveStream.getTracks().forEach(track => {
-          pc.addTrack(track, currentActiveStream);
-        });
-      }
-    };
+    const getActiveStream = () =>
+      sharingScreenRef.current ? screenStreamRef.current : localStreamRef.current;
 
+    // Create or return existing RTCPeerConnection for a peer
     function getOrCreatePeerConnection(memberId) {
       if (peerConnections.current[memberId]) {
-        const pc = peerConnections.current[memberId];
-        updatePeerTracks(pc);
-        return pc;
+        return peerConnections.current[memberId];
       }
 
-      console.log(`Creating RTCPeerConnection for peer: ${memberId}`);
+      console.log(`[WebRTC] Creating peer connection for: ${memberId}`);
       const pc = new RTCPeerConnection({
         iceServers: [
           { urls: 'stun:stun.l.google.com:19302' },
           { urls: 'stun:stun1.l.google.com:19302' },
           { urls: 'stun:stun2.l.google.com:19302' },
-          { urls: 'stun:stun3.l.google.com:19302' },
           {
             urls: 'turn:openrelay.metered.ca:80',
             username: 'openrelayproject',
@@ -497,9 +509,11 @@ export default function VirtualRoom({ group, currentStudent, allStudents, socket
 
       pc.iceCandidatesQueue = [];
 
-      if (currentActiveStream) {
-        currentActiveStream.getTracks().forEach(track => {
-          pc.addTrack(track, currentActiveStream);
+      // Add current local tracks
+      const activeStream = getActiveStream();
+      if (activeStream) {
+        activeStream.getTracks().forEach(track => {
+          pc.addTrack(track, activeStream);
         });
       }
 
@@ -514,59 +528,55 @@ export default function VirtualRoom({ group, currentStudent, allStudents, socket
       };
 
       pc.ontrack = (event) => {
-        console.log(`Received WebRTC remote track from ${memberId}`);
+        console.log(`[WebRTC] Remote track received from ${memberId}`);
         const stream = event.streams[0] || new MediaStream([event.track]);
         remoteStreams.current[memberId] = stream;
-        setRemoteVideoStreams(prev => ({
-          ...prev,
-          [memberId]: stream
-        }));
+        setRemoteVideoStreams(prev => ({ ...prev, [memberId]: stream }));
+      };
+
+      pc.onconnectionstatechange = () => {
+        console.log(`[WebRTC] ${memberId} connection state: ${pc.connectionState}`);
       };
 
       peerConnections.current[memberId] = pc;
       return pc;
     }
 
-    // Trigger initial WebRTC handshake requests
-    Object.keys(participants).forEach(peerId => {
-      if (peerId !== myId) {
+    // Send offer to peer
+    const triggerOffer = async (peerId) => {
+      const pc = getOrCreatePeerConnection(peerId);
+      // Don't create offer if one is already in progress
+      if (pc.signalingState !== 'stable') {
+        console.log(`[WebRTC] Skipping offer to ${peerId} - signalingState: ${pc.signalingState}`);
+        return;
+      }
+      try {
+        const offer = await pc.createOffer();
+        await pc.setLocalDescription(offer);
         socket.emit('videoCallSignal', {
           targetId: peerId,
           senderId: myId,
-          signal: { type: 'reconnect' }
+          signal: { type: 'offer', sdp: offer }
         });
-      }
-    });
-
-    const triggerOffer = async (peerId, bypassIdCheck = false) => {
-      const pc = getOrCreatePeerConnection(peerId);
-      if (bypassIdCheck || String(myId) < String(peerId)) {
-        try {
-          const offer = await pc.createOffer();
-          await pc.setLocalDescription(offer);
-          socket.emit('videoCallSignal', {
-            targetId: peerId,
-            senderId: myId,
-            signal: { type: 'offer', sdp: offer }
-          });
-        } catch (e) {
-          console.error("Offer creation failed:", e);
-        }
+        console.log(`[WebRTC] Offer sent to ${peerId}`);
+      } catch (e) {
+        console.error('[WebRTC] Offer creation failed:', e);
       }
     };
 
-    // Handle incoming socket signals
+    // Handle incoming WebRTC signal
     const handleIncomingSignal = async ({ senderId, signal }) => {
-      // Ensure sender is in participants list so they are rendered
+      // Auto-register sender into participants if not already present
       setParticipants(prev => {
         if (prev[senderId]) return prev;
-        const studentInfo = studentsMap[senderId] || {};
+        const info = studentsMapRef.current[senderId] || {};
+        console.log(`[WebRTC] Auto-adding participant from signal: ${senderId}`);
         return {
           ...prev,
           [senderId]: {
             id: senderId,
-            name: studentInfo.name || 'Student',
-            avatar: studentInfo.avatar || 'S',
+            name: info.name || 'Participant',
+            avatar: info.avatar || '',
             micOn: true,
             videoOn: true,
             raisedHand: false,
@@ -578,10 +588,13 @@ export default function VirtualRoom({ group, currentStudent, allStudents, socket
 
       try {
         if (signal.type === 'reconnect') {
-          if (peerConnections.current[senderId]) {
-            peerConnections.current[senderId].close();
+          console.log(`[WebRTC] Reconnect request from ${senderId}`);
+          const existing = peerConnections.current[senderId];
+          if (existing) {
+            existing.close();
             delete peerConnections.current[senderId];
           }
+          // Both sides create new PC; offerer is determined by ID comparison
           if (String(myId) < String(senderId)) {
             await triggerOffer(senderId);
           }
@@ -589,20 +602,22 @@ export default function VirtualRoom({ group, currentStudent, allStudents, socket
         }
 
         if (signal.type === 'offer') {
+          console.log(`[WebRTC] Offer received from ${senderId}`);
           let pc = peerConnections.current[senderId];
-          if (pc && pc.remoteDescription) {
+          // Close stale connection if remote description already set
+          if (pc && pc.signalingState !== 'stable') {
             pc.close();
             delete peerConnections.current[senderId];
             pc = null;
           }
-          if (!pc) {
-            pc = getOrCreatePeerConnection(senderId);
-          }
+          if (!pc) pc = getOrCreatePeerConnection(senderId);
+          
           await pc.setRemoteDescription(new RTCSessionDescription(signal.sdp));
-
-          if (pc.iceCandidatesQueue && pc.iceCandidatesQueue.length > 0) {
+          
+          // Flush queued ICE candidates
+          if (pc.iceCandidatesQueue.length > 0) {
             for (const cand of pc.iceCandidatesQueue) {
-              await pc.addIceCandidate(new RTCIceCandidate(cand));
+              await pc.addIceCandidate(new RTCIceCandidate(cand)).catch(console.error);
             }
             pc.iceCandidatesQueue = [];
           }
@@ -614,68 +629,80 @@ export default function VirtualRoom({ group, currentStudent, allStudents, socket
             senderId: myId,
             signal: { type: 'answer', sdp: answer }
           });
-        } else {
-          const pc = getOrCreatePeerConnection(senderId);
-          if (signal.type === 'answer') {
-            await pc.setRemoteDescription(new RTCSessionDescription(signal.sdp));
-            if (pc.iceCandidatesQueue && pc.iceCandidatesQueue.length > 0) {
-              for (const cand of pc.iceCandidatesQueue) {
-                await pc.addIceCandidate(new RTCIceCandidate(cand));
-              }
-              pc.iceCandidatesQueue = [];
+          console.log(`[WebRTC] Answer sent to ${senderId}`);
+          return;
+        }
+
+        if (signal.type === 'answer') {
+          const pc = peerConnections.current[senderId];
+          if (!pc) return;
+          if (pc.signalingState !== 'have-local-offer') {
+            console.warn(`[WebRTC] Unexpected answer from ${senderId} in state ${pc.signalingState}`);
+            return;
+          }
+          await pc.setRemoteDescription(new RTCSessionDescription(signal.sdp));
+          if (pc.iceCandidatesQueue.length > 0) {
+            for (const cand of pc.iceCandidatesQueue) {
+              await pc.addIceCandidate(new RTCIceCandidate(cand)).catch(console.error);
             }
-          } else if (signal.type === 'candidate') {
-            if (pc.remoteDescription) {
-              await pc.addIceCandidate(new RTCIceCandidate(signal.candidate));
-            } else {
-              pc.iceCandidatesQueue.push(signal.candidate);
-            }
+            pc.iceCandidatesQueue = [];
+          }
+          console.log(`[WebRTC] Answer set from ${senderId}`);
+          return;
+        }
+
+        if (signal.type === 'candidate') {
+          const pc = peerConnections.current[senderId] || getOrCreatePeerConnection(senderId);
+          if (pc.remoteDescription && pc.remoteDescription.type) {
+            await pc.addIceCandidate(new RTCIceCandidate(signal.candidate)).catch(console.error);
+          } else {
+            pc.iceCandidatesQueue.push(signal.candidate);
           }
         }
       } catch (err) {
-        console.error("WebRTC Signaling handling error:", err);
+        console.error('[WebRTC] Signal handling error:', err);
       }
     };
 
-    // Socket Event: Someone joined meeting
+    // User joined meeting — add to participants and trigger offer
     const handleUserJoined = (student) => {
+      console.log(`[Meeting] User joined: ${student.name}`);
       setParticipants(prev => ({
         ...prev,
         [student.id]: {
           ...student,
           micOn: student.micOn ?? true,
           videoOn: student.videoOn ?? true,
-          raisedHand: student.raisedHand ?? false,
-          isSpeaking: student.isSpeaking ?? false,
+          raisedHand: false,
+          isSpeaking: false,
           online: true
         }
       }));
-      // send our details back so they populate their list
+      // Broadcast our current state to the joiner
       socket.emit('meetingStatusUpdate', {
-        groupId: group.id,
+        groupId: groupIdRef.current,
         studentId: myId,
         status: {
-          name: currentStudent.name,
-          avatar: currentStudent.avatar,
-          micOn,
-          videoOn,
-          raisedHand
+          name: currentStudentRef.current.name,
+          avatar: currentStudentRef.current.avatar,
+          micOn: micOnRef.current,
+          videoOn: videoOnRef.current,
+          raisedHand: raisedHandRef.current
         }
       });
-      triggerOffer(student.id, true);
+      // Existing user always creates the offer to the new joiner
+      triggerOffer(student.id);
     };
 
-    // Socket Event: Someone left meeting
     const handleUserLeft = (studentId) => {
+      console.log(`[Meeting] User left: ${studentId}`);
       setParticipants(prev => {
         const next = { ...prev };
         delete next[studentId];
         return next;
       });
-      if (peerConnections.current[studentId]) {
-        peerConnections.current[studentId].close();
-        delete peerConnections.current[studentId];
-      }
+      const pc = peerConnections.current[studentId];
+      if (pc) { pc.close(); delete peerConnections.current[studentId]; }
       setRemoteVideoStreams(prev => {
         const next = { ...prev };
         delete next[studentId];
@@ -683,26 +710,22 @@ export default function VirtualRoom({ group, currentStudent, allStudents, socket
       });
     };
 
-    // Socket Event: User goes offline abruptly
-    const handleUserOffline = (studentId) => {
-      handleUserLeft(studentId);
-    };
+    const handleUserOffline = (studentId) => handleUserLeft(studentId);
 
-    // Socket Event: Participant status modified
     const handleStatusUpdate = ({ studentId, status }) => {
       setParticipants(prev => {
         const existing = prev[studentId] || {};
-        const studentInfo = studentsMap[studentId] || {};
+        const info = studentsMapRef.current[studentId] || {};
         return {
           ...prev,
           [studentId]: {
             id: studentId,
-            name: status.name || existing.name || studentInfo.name || 'Student',
-            avatar: status.avatar || existing.avatar || studentInfo.avatar || 'S',
-            micOn: status.micOn ?? existing.micOn ?? true,
-            videoOn: status.videoOn ?? existing.videoOn ?? true,
-            raisedHand: status.raisedHand ?? existing.raisedHand ?? false,
-            isSpeaking: status.isSpeaking ?? existing.isSpeaking ?? false,
+            name: existing.name || info.name || status.name || 'Participant',
+            avatar: existing.avatar || info.avatar || status.avatar || '',
+            micOn: true,
+            videoOn: true,
+            raisedHand: false,
+            isSpeaking: false,
             online: true,
             ...existing,
             ...status
@@ -711,48 +734,38 @@ export default function VirtualRoom({ group, currentStudent, allStudents, socket
       });
 
       if (status.isSpeaking !== undefined) {
-        if (status.isSpeaking) {
-          setActiveSpeaker(studentId);
-        } else if (activeSpeaker === studentId) {
-          setActiveSpeaker(null);
-        }
+        setActiveSpeaker(status.isSpeaking ? studentId : prev => prev === studentId ? null : prev);
       }
     };
 
-    // Socket Event: Emoji Reaction received
     const handleIncomingEmojiReaction = ({ studentId, emoji }) => {
-      const studentName = studentsMap[studentId]?.name || 'Student';
-      displayReaction(studentName, emoji);
+      const name = studentsMapRef.current[studentId]?.name || 'Student';
+      displayReaction(name, emoji);
     };
 
-    // Socket Event: Meeting chat message received
     const handleReceiveMeetingMessage = (msg) => {
       setInMeetingMessages(prev => [...prev, msg]);
     };
 
-    // Socket Event: Admin host controls
     const handleIncomingMeetingControl = ({ command, targetId, value }) => {
       if (command === 'lock') {
         setMeetingLocked(value);
       } else if (command === 'end') {
-        alert("The host has ended this meeting for everyone.");
+        alert('The host has ended this meeting for everyone.');
         resetCallState();
       } else if (targetId === myId) {
         if (command === 'mute') {
           setMicOn(false);
-          if (localStream) {
-            localStream.getAudioTracks().forEach(track => {
-              track.enabled = false;
-            });
-          }
+          const stream = localStreamRef.current;
+          if (stream) stream.getAudioTracks().forEach(t => { t.enabled = false; });
           socket.emit('meetingStatusUpdate', {
-            groupId: group.id,
+            groupId: groupIdRef.current,
             studentId: myId,
             status: { micOn: false }
           });
-          alert("You have been muted by the host.");
+          alert('You have been muted by the host.');
         } else if (command === 'remove') {
-          alert("You were removed from the meeting by the host.");
+          alert('You were removed from the meeting by the host.');
           resetCallState();
         }
       }
@@ -767,6 +780,8 @@ export default function VirtualRoom({ group, currentStudent, allStudents, socket
     socket.on('receiveMeetingMessage', handleReceiveMeetingMessage);
     socket.on('incomingMeetingControl', handleIncomingMeetingControl);
 
+    console.log('[Meeting] Socket listeners registered');
+
     return () => {
       socket.off('incomingVideoCallSignal', handleIncomingSignal);
       socket.off('meetingUserJoined', handleUserJoined);
@@ -776,8 +791,39 @@ export default function VirtualRoom({ group, currentStudent, allStudents, socket
       socket.off('incomingEmojiReaction', handleIncomingEmojiReaction);
       socket.off('receiveMeetingMessage', handleReceiveMeetingMessage);
       socket.off('incomingMeetingControl', handleIncomingMeetingControl);
+      console.log('[Meeting] Socket listeners cleaned up');
     };
-  }, [socket, joined, localStream, screenStream, sharingScreen, participants, micOn, videoOn, raisedHand, activeSpeaker, studentsMap]);
+  }, [socket, joined]); // eslint-disable-line react-hooks/exhaustive-deps
+
+  // When stream changes (e.g. user toggles camera after joining), renegotiate all existing peers
+  useEffect(() => {
+    if (!joined || !localStream) return;
+    const peers = Object.keys(peerConnections.current);
+    if (peers.length === 0) return;
+
+    peers.forEach(async (peerId) => {
+      const pc = peerConnections.current[peerId];
+      if (!pc) return;
+      const senders = pc.getSenders();
+      senders.forEach(sender => pc.removeTrack(sender));
+      localStream.getTracks().forEach(track => pc.addTrack(track, localStream));
+      if (pc.signalingState === 'stable') {
+        try {
+          const offer = await pc.createOffer();
+          await pc.setLocalDescription(offer);
+          if (socket) {
+            socket.emit('videoCallSignal', {
+              targetId: peerId,
+              senderId: currentStudent.id,
+              signal: { type: 'offer', sdp: offer }
+            });
+          }
+        } catch (e) {
+          console.error('[WebRTC] Stream renegotiation failed:', e);
+        }
+      }
+    });
+  }, [localStream]); // eslint-disable-line react-hooks/exhaustive-deps
 
   // Display Reaction Floating Card
   const displayReaction = (name, emoji) => {
