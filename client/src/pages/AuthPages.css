@@ -31,10 +31,10 @@
   width: 56px;
   height: 56px;
   border-radius: var(--radius-md);
-  background: rgba(99, 102, 241, 0.1);
+  background: var(--primary-glow);
   color: var(--primary);
   margin-bottom: 16px;
-  border: 1px solid rgba(99, 102, 241, 0.2);
+  border: 1px solid var(--border-color-hover);
   filter: drop-shadow(0 0 4px var(--primary-glow));
 }
 

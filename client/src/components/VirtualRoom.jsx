@@ -56,7 +56,7 @@ export default function VirtualRoom({ group, currentStudent, allStudents, socket
   // Collaborative Whiteboard Canvas States
   const canvasRef = useRef(null);
   const [isDrawing, setIsDrawing] = useState(false);
-  const [color, setColor] = useState('#6366f1'); 
+  const [color, setColor] = useState('#aeff00'); 
   const [lineWidth, setLineWidth] = useState(4);
 
   // Admin Check
@@ -1241,7 +1241,7 @@ export default function VirtualRoom({ group, currentStudent, allStudents, socket
                 
                 <div className="whiteboard-tools-panel">
                   <div className="color-selectors">
-                    {['#6366f1', '#e11d48', '#10b981', '#f59e0b', '#ffffff'].map(c => (
+                    {['#aeff00', '#e11d48', '#10b981', '#f59e0b', '#ffffff'].map(c => (
                       <span 
                         key={c}
                         onClick={() => setColor(c)}
