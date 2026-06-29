@@ -1951,11 +1951,6 @@ export default function VirtualRoom({ group, currentStudent, allStudents, socket
         .reactions-popover-wrapper, .layouts-popover-wrapper, .leave-popover-wrapper {
           position: relative;
         }
-        .reactions-popover-wrapper:hover .reactions-popover,
-        .layouts-popover-wrapper:hover .layouts-popover,
-        .leave-popover-wrapper:hover .leave-popover {
-          display: flex;
-        }
         .reactions-popover {
           display: none;
           position: absolute;
