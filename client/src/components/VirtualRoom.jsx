@@ -119,59 +119,58 @@ export default function VirtualRoom({ group, currentStudent, allStudents, socket
     };
   }, [joined, videoOn]);
 
-  // Handle local camera & microphone streams when meeting is joined
+  // Handle local camera stream when meeting is joined
   useEffect(() => {
     if (!joined) return;
     let activeStream = null;
 
-    async function startCameraAndMic() {
-      // If we are sharing screen, we only need audio from getUserMedia, not video.
-      const needsVideo = videoOn && !sharingScreen;
-      const needsAudio = true; // Always capture mic so user can speak during screenshare
-
-      console.log(`[WebRTC] Starting local camera/mic. Audio: ${needsAudio}, Video: ${needsVideo}`);
-
-      try {
-        const stream = await navigator.mediaDevices.getUserMedia({
-          video: needsVideo ? { width: 640, height: 480 } : false,
-          audio: needsAudio
-        });
-
-        // Apply current mic status
-        stream.getAudioTracks().forEach(track => {
-          track.enabled = micOn;
-        });
-
-        setLocalStream(stream);
-        activeStream = stream;
+    async function startCamera() {
+      if (localStream) {
+        activeStream = localStream;
         if (localVideoRef.current) {
-          localVideoRef.current.srcObject = stream;
+          localVideoRef.current.srcObject = localStream;
         }
-        setPermissionError(null);
-      } catch (err) {
-        console.error("Camera/Mic access failed:", err);
-        setPermissionError("Could not access camera/microphone. Audio fallback.");
+        return;
+      }
+      if (videoOn && !sharingScreen) {
         try {
-          const audioOnlyStream = await navigator.mediaDevices.getUserMedia({ video: false, audio: true });
-          audioOnlyStream.getAudioTracks().forEach(track => {
+          const stream = await navigator.mediaDevices.getUserMedia({ video: true, audio: true });
+          
+          // Apply initial mic status
+          stream.getAudioTracks().forEach(track => {
             track.enabled = micOn;
           });
-          setLocalStream(audioOnlyStream);
-          activeStream = audioOnlyStream;
-        } catch (audioErr) {
-          console.error("Audio fallback failed:", audioErr);
+
+          setLocalStream(stream);
+          activeStream = stream;
+          if (localVideoRef.current) {
+            localVideoRef.current.srcObject = stream;
+          }
+          setPermissionError(null);
+        } catch (err) {
+          console.error("Camera access failed on call start:", err);
+          setPermissionError("Could not access microphone/camera. Joining audio-only.");
+          try {
+            const audioOnlyStream = await navigator.mediaDevices.getUserMedia({ video: false, audio: true });
+            setLocalStream(audioOnlyStream);
+            activeStream = audioOnlyStream;
+          } catch (audioErr) {
+            console.error("Microphone access failed too:", audioErr);
+          }
         }
+      } else {
+        setLocalStream(null);
       }
     }
 
-    startCameraAndMic();
+    startCamera();
 
     return () => {
       if (activeStream) {
         activeStream.getTracks().forEach(track => track.stop());
       }
     };
-  }, [joined, videoOn, sharingScreen]); // eslint-disable-line react-hooks/exhaustive-deps
+  }, [joined, videoOn, sharingScreen]);
 
   // Bind local stream to video element when it changes
   useEffect(() => {
@@ -188,18 +187,18 @@ export default function VirtualRoom({ group, currentStudent, allStudents, socket
     async function startScreenShare() {
       if (sharingScreen) {
         try {
-          console.log("[WebRTC] Requesting screen capture...");
           const stream = await navigator.mediaDevices.getDisplayMedia({ video: true, audio: true });
           setScreenStream(stream);
           activeStream = stream;
           if (screenVideoRef.current) {
             screenVideoRef.current.srcObject = stream;
           }
+          setLayout('screenshare');
 
           // Listen for stop sharing from browser native UI bar
           stream.getVideoTracks()[0].onended = () => {
-            console.log("[WebRTC] Native screen share ended");
             setSharingScreen(false);
+            setLayout('gallery');
           };
         } catch (err) {
           console.error("Screen sharing failed:", err);
@@ -525,25 +524,13 @@ export default function VirtualRoom({ group, currentStudent, allStudents, socket
 
       pc.iceCandidatesQueue = [];
 
-      // Add current active tracks (audio from localStream, video from local or screen stream)
-      const audioTrack = localStreamRef.current?.getAudioTracks()[0];
-      const videoTrack = sharingScreenRef.current ? screenStreamRef.current?.getVideoTracks()[0] : localStreamRef.current?.getVideoTracks()[0];
-
-      if (audioTrack) {
-        console.log(`[WebRTC] Adding initial audio track to peer ${memberId}`);
-        pc.addTrack(audioTrack, localStreamRef.current);
+      // Add current local tracks
+      const activeStream = getActiveStream();
+      if (activeStream) {
+        activeStream.getTracks().forEach(track => {
+          pc.addTrack(track, activeStream);
+        });
       }
-      if (videoTrack) {
-        console.log(`[WebRTC] Adding initial video track to peer ${memberId}`);
-        pc.addTrack(videoTrack, sharingScreenRef.current ? screenStreamRef.current : localStreamRef.current);
-      }
-
-      pc.onnegotiationneeded = async () => {
-        console.log(`[WebRTC] Negotiation needed for peer: ${memberId}`);
-        if (pc.signalingState === 'stable') {
-          await triggerOffer(memberId);
-        }
-      };
 
       pc.onicecandidate = (event) => {
         if (event.candidate) {
@@ -823,69 +810,35 @@ export default function VirtualRoom({ group, currentStudent, allStudents, socket
     };
   }, [socket, joined]); // eslint-disable-line react-hooks/exhaustive-deps
 
-  // Unified Track Sync Effect: Swaps audio/video tracks on all active peer connections when streams change
+  // When stream changes (e.g. user toggles camera after joining), renegotiate all existing peers
   useEffect(() => {
-    if (!joined) return;
-
-    const activeStream = sharingScreen ? screenStream : localStream;
-    const videoTrack = sharingScreen ? screenStream?.getVideoTracks()[0] : localStream?.getVideoTracks()[0];
-    const audioTrack = localStream?.getAudioTracks()[0];
-
-    console.log(`[WebRTC] Unified Track Sync: VideoTrack=${videoTrack?.id}, AudioTrack=${audioTrack?.id}, Sharing=${sharingScreen}`);
-
+    if (!joined || !localStream) return;
     const peers = Object.keys(peerConnections.current);
+    if (peers.length === 0) return;
+
     peers.forEach(async (peerId) => {
       const pc = peerConnections.current[peerId];
       if (!pc) return;
-
-      try {
-        const senders = pc.getSenders();
-
-        // 1. Sync Video Track
-        const videoSender = senders.find(s => s.track && s.track.kind === 'video');
-        if (videoSender) {
-          if (videoTrack) {
-            console.log(`[WebRTC] replaceTrack (video) to ${videoTrack.id} for peer ${peerId}`);
-            await videoSender.replaceTrack(videoTrack);
-          } else {
-            console.log(`[WebRTC] replaceTrack (video) to null (camera off) for peer ${peerId}`);
-            await videoSender.replaceTrack(null);
+      const senders = pc.getSenders();
+      senders.forEach(sender => pc.removeTrack(sender));
+      localStream.getTracks().forEach(track => pc.addTrack(track, localStream));
+      if (pc.signalingState === 'stable') {
+        try {
+          const offer = await pc.createOffer();
+          await pc.setLocalDescription(offer);
+          if (socket) {
+            socket.emit('videoCallSignal', {
+              targetId: peerId,
+              senderId: currentStudent.id,
+              signal: { type: 'offer', sdp: offer }
+            });
           }
-        } else if (videoTrack) {
-          console.log(`[WebRTC] addTrack (video) ${videoTrack.id} for peer ${peerId}`);
-          pc.addTrack(videoTrack, activeStream);
+        } catch (e) {
+          console.error('[WebRTC] Stream renegotiation failed:', e);
         }
-
-        // 2. Sync Audio Track
-        const audioSender = senders.find(s => s.track && s.track.kind === 'audio');
-        if (audioSender) {
-          if (audioTrack) {
-            console.log(`[WebRTC] replaceTrack (audio) to ${audioTrack.id} for peer ${peerId}`);
-            await audioSender.replaceTrack(audioTrack);
-          } else {
-            await audioSender.replaceTrack(null);
-          }
-        } else if (audioTrack) {
-          console.log(`[WebRTC] addTrack (audio) ${audioTrack.id} for peer ${peerId}`);
-          pc.addTrack(audioTrack, localStream);
-        }
-      } catch (err) {
-        console.error(`[WebRTC] Track sync failed for peer ${peerId}:`, err);
       }
     });
-
-    // Notify other participants of our status
-    if (socket) {
-      socket.emit('meetingStatusUpdate', {
-        groupId: group.id,
-        studentId: currentStudent.id,
-        status: {
-          videoOn: videoOn,
-          sharingScreen: sharingScreen
-        }
-      });
-    }
-  }, [joined, localStream, screenStream, sharingScreen, videoOn]); // eslint-disable-line react-hooks/exhaustive-deps
+  }, [localStream]); // eslint-disable-line react-hooks/exhaustive-deps
 
   // Display Reaction Floating Card
   const displayReaction = (name, emoji) => {
@@ -1230,9 +1183,6 @@ export default function VirtualRoom({ group, currentStudent, allStudents, socket
 
   // ACTIVE MEETING ROOM LAYOUT
   const activeParticipantsCount = Object.keys(participants).length;
-  const anyRemoteSharing = Object.values(participants).some(p => p.id !== currentStudent.id && p.sharingScreen);
-  const isCurrentlySharingScreen = sharingScreen || anyRemoteSharing;
-  const currentLayout = isCurrentlySharingScreen ? 'screenshare' : layout;
 
   return (
     <div className="active-meeting-container animate-fade-in">
@@ -1326,7 +1276,7 @@ export default function VirtualRoom({ group, currentStudent, allStudents, socket
             )}
 
             {/* Video Grids */}
-            <div className={`meeting-video-grid layout-${currentLayout}`}>
+            <div className={`meeting-video-grid layout-${layout}`}>
               
               {/* Screen Share Tile */}
               {sharingScreen && (
@@ -1340,7 +1290,7 @@ export default function VirtualRoom({ group, currentStudent, allStudents, socket
               )}
 
               {/* Local Participant Tile */}
-              {(!sharingScreen || currentLayout !== 'screenshare') && (
+              {(!sharingScreen || layout !== 'screenshare') && (
                 <div className={`video-card ${activeSpeaker === currentStudent.id ? 'active-speaker' : ''}`}>
                   {videoOn ? (
                     <video ref={localVideoRef} autoPlay playsInline muted />
@@ -1368,11 +1318,10 @@ export default function VirtualRoom({ group, currentStudent, allStudents, socket
                 const hasStream = remoteVideoStreams[peerId] || remoteVideoStreams[String(peerId)];
                 const stream = remoteVideoStreams[peerId] || remoteVideoStreams[String(peerId)];
                 const isSpeaking = activeSpeaker === peerId;
-                const isPresenter = peer.sharingScreen;
 
                 return (
-                  <div key={peerId} className={`video-card ${isSpeaking ? 'active-speaker' : ''} ${isPresenter ? 'screen-share-card' : ''}`}>
-                    {(peer.videoOn || peer.sharingScreen) && hasStream ? (
+                  <div key={peerId} className={`video-card ${isSpeaking ? 'active-speaker' : ''}`}>
+                    {peer.videoOn && hasStream ? (
                       <>
                         <video 
                           ref={el => {
@@ -1507,7 +1456,7 @@ export default function VirtualRoom({ group, currentStudent, allStudents, socket
                   <div className="layouts-popover" style={{ display: 'flex' }}>
                     <button onClick={() => { setLayout('gallery'); setShowLayoutPopover(false); }} className={`layout-pop-btn ${layout === 'gallery' ? 'active' : ''}`}>Gallery Grid</button>
                     <button onClick={() => { setLayout('speaker'); setShowLayoutPopover(false); }} className={`layout-pop-btn ${layout === 'speaker' ? 'active' : ''}`}>Speaker Spotlight</button>
-                    {isCurrentlySharingScreen && (
+                    {sharingScreen && (
                       <button onClick={() => { setLayout('screenshare'); setShowLayoutPopover(false); }} className={`layout-pop-btn ${layout === 'screenshare' ? 'active' : ''}`}>Screen Focus</button>
                     )}
                   </div>
