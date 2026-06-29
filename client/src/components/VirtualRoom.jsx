@@ -274,13 +274,22 @@ export default function VirtualRoom({ group, currentStudent, allStudents, socket
     }
   };
 
-  // Speaking Detection using Web Audio API
+  // Stable refs for speaking detection (avoids stale closure re-runs)
+  const socketRef = useRef(socket);
+  const groupIdRef2 = useRef(group.id);
+  const currentStudentIdRef = useRef(currentStudent.id);
+  useEffect(() => { socketRef.current = socket; }, [socket]);
+  useEffect(() => { groupIdRef2.current = group.id; }, [group.id]);
+  useEffect(() => { currentStudentIdRef.current = currentStudent.id; }, [currentStudent.id]);
+
+  // Speaking Detection — uses requestAnimationFrame instead of deprecated ScriptProcessor
+  // This avoids blocking the main thread and never floods the socket
   useEffect(() => {
     if (!joined || !localStream || !micOn) {
-      if (socket && joined) {
-        socket.emit('meetingStatusUpdate', {
-          groupId: group.id,
-          studentId: currentStudent.id,
+      if (socketRef.current && joined) {
+        socketRef.current.emit('meetingStatusUpdate', {
+          groupId: groupIdRef2.current,
+          studentId: currentStudentIdRef.current,
           status: { isSpeaking: false }
         });
       }
@@ -290,8 +299,9 @@ export default function VirtualRoom({ group, currentStudent, allStudents, socket
     let audioContext = null;
     let analyser = null;
     let microphone = null;
-    let javascriptNode = null;
+    let rafId = null;
     let isCurrentlySpeaking = false;
+    let lastEmitTime = 0;
 
     try {
       const audioTrack = localStream.getAudioTracks()[0];
@@ -299,48 +309,50 @@ export default function VirtualRoom({ group, currentStudent, allStudents, socket
 
       audioContext = new (window.AudioContext || window.webkitAudioContext)();
       analyser = audioContext.createAnalyser();
-      microphone = audioContext.createMediaStreamSource(new MediaStream([audioTrack]));
-      javascriptNode = audioContext.createScriptProcessor(2048, 1, 1);
-
+      analyser.fftSize = 256;
       analyser.smoothingTimeConstant = 0.8;
-      analyser.fftSize = 1024;
-
+      microphone = audioContext.createMediaStreamSource(new MediaStream([audioTrack]));
       microphone.connect(analyser);
-      analyser.connect(javascriptNode);
-      javascriptNode.connect(audioContext.destination);
 
-      javascriptNode.onaudioprocess = () => {
-        const array = new Uint8Array(analyser.frequencyBinCount);
-        analyser.getByteFrequencyData(array);
-        let values = 0;
-        const length = array.length;
-        for (let i = 0; i < length; i++) {
-          values += array[i];
-        }
-        const average = values / length;
+      const dataArray = new Uint8Array(analyser.frequencyBinCount);
 
-        // If audio level is above speaking threshold
+      const checkAudio = (timestamp) => {
+        rafId = requestAnimationFrame(checkAudio);
+
+        // Only process at most every 150ms to avoid flooding
+        if (timestamp - lastEmitTime < 150) return;
+        lastEmitTime = timestamp;
+
+        analyser.getByteFrequencyData(dataArray);
+        let sum = 0;
+        for (let i = 0; i < dataArray.length; i++) sum += dataArray[i];
+        const average = sum / dataArray.length;
+
         const speaking = average > 15;
         if (speaking !== isCurrentlySpeaking) {
           isCurrentlySpeaking = speaking;
-          socket.emit('meetingStatusUpdate', {
-            groupId: group.id,
-            studentId: currentStudent.id,
-            status: { isSpeaking: speaking }
-          });
-          setActiveSpeaker(speaking ? currentStudent.id : null);
+          if (socketRef.current) {
+            socketRef.current.emit('meetingStatusUpdate', {
+              groupId: groupIdRef2.current,
+              studentId: currentStudentIdRef.current,
+              status: { isSpeaking: speaking }
+            });
+          }
+          setActiveSpeaker(speaking ? currentStudentIdRef.current : null);
         }
       };
+
+      rafId = requestAnimationFrame(checkAudio);
     } catch (e) {
-      console.error("Audio speaking analyzer error:", e);
+      console.error('Audio speaking analyzer error:', e);
     }
 
     return () => {
-      if (javascriptNode) javascriptNode.disconnect();
+      if (rafId) cancelAnimationFrame(rafId);
       if (microphone) microphone.disconnect();
       if (audioContext && audioContext.state !== 'closed') audioContext.close();
     };
-  }, [joined, localStream, micOn, socket, group.id, currentStudent.id]);
+  }, [joined, localStream, micOn]); // eslint-disable-line react-hooks/exhaustive-deps
 
   // Join Call handler
   const handleJoinCall = async () => {
@@ -2269,7 +2281,8 @@ export default function VirtualRoom({ group, currentStudent, allStudents, socket
           height: 500px;
           pointer-events: none;
           overflow: hidden;
-          z-index: 1000;
+          z-index: 50;
+          isolation: isolate;
         }
         .floating-reaction {
           position: absolute;
