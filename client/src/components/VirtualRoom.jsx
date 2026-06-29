@@ -445,7 +445,22 @@ export default function VirtualRoom({ group, currentStudent, allStudents, socket
           { urls: 'stun:stun.l.google.com:19302' },
           { urls: 'stun:stun1.l.google.com:19302' },
           { urls: 'stun:stun2.l.google.com:19302' },
-          { urls: 'stun:stun3.l.google.com:19302' }
+          { urls: 'stun:stun3.l.google.com:19302' },
+          {
+            urls: 'turn:openrelay.metered.ca:80',
+            username: 'openrelayproject',
+            credential: 'openrelayproject'
+          },
+          {
+            urls: 'turn:openrelay.metered.ca:443',
+            username: 'openrelayproject',
+            credential: 'openrelayproject'
+          },
+          {
+            urls: 'turn:openrelay.metered.ca:443?transport=tcp',
+            username: 'openrelayproject',
+            credential: 'openrelayproject'
+          }
         ]
       });
 
@@ -492,9 +507,9 @@ export default function VirtualRoom({ group, currentStudent, allStudents, socket
       }
     });
 
-    const triggerOffer = async (peerId) => {
+    const triggerOffer = async (peerId, bypassIdCheck = false) => {
       const pc = getOrCreatePeerConnection(peerId);
-      if (String(myId) < String(peerId)) {
+      if (bypassIdCheck || String(myId) < String(peerId)) {
         try {
           const offer = await pc.createOffer();
           await pc.setLocalDescription(offer);
@@ -511,6 +526,25 @@ export default function VirtualRoom({ group, currentStudent, allStudents, socket
 
     // Handle incoming socket signals
     const handleIncomingSignal = async ({ senderId, signal }) => {
+      // Ensure sender is in participants list so they are rendered
+      setParticipants(prev => {
+        if (prev[senderId]) return prev;
+        const studentInfo = studentsMap[senderId] || {};
+        return {
+          ...prev,
+          [senderId]: {
+            id: senderId,
+            name: studentInfo.name || 'Student',
+            avatar: studentInfo.avatar || 'S',
+            micOn: true,
+            videoOn: true,
+            raisedHand: false,
+            isSpeaking: false,
+            online: true
+          }
+        };
+      });
+
       try {
         if (signal.type === 'reconnect') {
           if (peerConnections.current[senderId]) {
@@ -597,7 +631,7 @@ export default function VirtualRoom({ group, currentStudent, allStudents, socket
           raisedHand
         }
       });
-      triggerOffer(student.id);
+      triggerOffer(student.id, true);
     };
 
     // Socket Event: Someone left meeting
@@ -626,11 +660,20 @@ export default function VirtualRoom({ group, currentStudent, allStudents, socket
     // Socket Event: Participant status modified
     const handleStatusUpdate = ({ studentId, status }) => {
       setParticipants(prev => {
-        if (!prev[studentId]) return prev;
+        const existing = prev[studentId] || {};
+        const studentInfo = studentsMap[studentId] || {};
         return {
           ...prev,
           [studentId]: {
-            ...prev[studentId],
+            id: studentId,
+            name: status.name || existing.name || studentInfo.name || 'Student',
+            avatar: status.avatar || existing.avatar || studentInfo.avatar || 'S',
+            micOn: status.micOn ?? existing.micOn ?? true,
+            videoOn: status.videoOn ?? existing.videoOn ?? true,
+            raisedHand: status.raisedHand ?? existing.raisedHand ?? false,
+            isSpeaking: status.isSpeaking ?? existing.isSpeaking ?? false,
+            online: true,
+            ...existing,
             ...status
           }
         };
