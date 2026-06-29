@@ -122,6 +122,13 @@ export default function VirtualRoom({ group, currentStudent, allStudents, socket
     let activeStream = null;
 
     async function startCamera() {
+      if (localStream) {
+        activeStream = localStream;
+        if (localVideoRef.current) {
+          localVideoRef.current.srcObject = localStream;
+        }
+        return;
+      }
       if (videoOn && !sharingScreen) {
         try {
           const stream = await navigator.mediaDevices.getUserMedia({ video: true, audio: true });
@@ -333,11 +340,35 @@ export default function VirtualRoom({ group, currentStudent, allStudents, socket
   }, [joined, localStream, micOn, socket, group.id, currentStudent.id]);
 
   // Join Call handler
-  const handleJoinCall = () => {
+  const handleJoinCall = async () => {
     if (meetingLocked && !isAdmin) {
       alert("This meeting is locked by the Host. You cannot join.");
       return;
     }
+
+    // Acquire local stream first!
+    let activeStream = null;
+    if (videoOn) {
+      try {
+        activeStream = await navigator.mediaDevices.getUserMedia({ video: true, audio: true });
+        // Apply initial mic status
+        activeStream.getAudioTracks().forEach(track => {
+          track.enabled = micOn;
+        });
+        setLocalStream(activeStream);
+        setPermissionError(null);
+      } catch (err) {
+        console.error("Camera access failed on call join:", err);
+        setPermissionError("Could not access microphone/camera. Joining audio-only.");
+        try {
+          activeStream = await navigator.mediaDevices.getUserMedia({ video: false, audio: true });
+          setLocalStream(activeStream);
+        } catch (audioErr) {
+          console.error("Microphone access failed too:", audioErr);
+        }
+      }
+    }
+
     setJoined(true);
     setParticipants({
       [currentStudent.id]: {
@@ -345,7 +376,7 @@ export default function VirtualRoom({ group, currentStudent, allStudents, socket
         name: currentStudent.name,
         avatar: currentStudent.avatar,
         micOn,
-        videoOn,
+        videoOn: activeStream ? activeStream.getVideoTracks().length > 0 : false,
         raisedHand: false,
         isSpeaking: false,
         online: true
@@ -361,7 +392,7 @@ export default function VirtualRoom({ group, currentStudent, allStudents, socket
           name: currentStudent.name,
           avatar: currentStudent.avatar,
           micOn,
-          videoOn
+          videoOn: activeStream ? activeStream.getVideoTracks().length > 0 : false
         }
       });
     }
@@ -1230,24 +1261,47 @@ export default function VirtualRoom({ group, currentStudent, allStudents, socket
                 return (
                   <div key={peerId} className={`video-card ${isSpeaking ? 'active-speaker' : ''}`}>
                     {peer.videoOn && hasStream ? (
-                      <video 
-                        ref={el => {
-                          if (el && el.srcObject !== stream) {
-                            el.srcObject = stream;
-                          }
-                        }}
-                        autoPlay 
-                        playsInline 
-                      />
+                      <>
+                        <video 
+                          ref={el => {
+                            if (el && el.srcObject !== stream) {
+                              el.srcObject = stream;
+                            }
+                          }}
+                          autoPlay 
+                          playsInline 
+                          muted
+                        />
+                        <audio 
+                          ref={el => {
+                            if (el && el.srcObject !== stream) {
+                              el.srcObject = stream;
+                            }
+                          }}
+                          autoPlay
+                        />
+                      </>
                     ) : (
-                      <div className="video-placeholder">
-                        {peer.avatar && peer.avatar !== 'https://via.placeholder.com/150' ? (
-                          <img src={peer.avatar} alt={peer.name} className="placeholder-avatar" />
-                        ) : (
-                          <div className="placeholder-avatar initials">{peer.name.charAt(0).toUpperCase()}</div>
+                      <>
+                        {hasStream && (
+                          <audio 
+                            ref={el => {
+                              if (el && el.srcObject !== stream) {
+                                el.srcObject = stream;
+                              }
+                            }}
+                            autoPlay
+                          />
                         )}
-                        <span className="placeholder-name">Camera Off</span>
-                      </div>
+                        <div className="video-placeholder">
+                          {peer.avatar && peer.avatar !== 'https://via.placeholder.com/150' ? (
+                            <img src={peer.avatar} alt={peer.name} className="placeholder-avatar" />
+                          ) : (
+                            <div className="placeholder-avatar initials">{peer.name.charAt(0).toUpperCase()}</div>
+                          )}
+                          <span className="placeholder-name">Camera Off</span>
+                        </div>
+                      </>
                     )}
 
                     <div className="video-card-badge">
