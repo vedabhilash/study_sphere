@@ -44,6 +44,9 @@ export default function VirtualRoom({ group, currentStudent, allStudents, socket
   const [showSidebar, setShowSidebar] = useState(true);
   const [sidebarTab, setSidebarTab] = useState('chat'); // 'chat' | 'participants'
   const [reactions, setReactions] = useState([]);
+  const [showReactionsPopover, setShowReactionsPopover] = useState(false);
+  const [showLeavePopover, setShowLeavePopover] = useState(false);
+  const [showLayoutPopover, setShowLayoutPopover] = useState(false);
 
   // Meeting Chat
   const [inMeetingMessages, setInMeetingMessages] = useState([]);
@@ -1410,30 +1413,42 @@ export default function VirtualRoom({ group, currentStudent, allStudents, socket
                 <Hand size={16} className={raisedHand ? 'fill-warning' : ''} />
               </button>
 
-              <div className="reactions-popover-wrapper">
-                <button className="btn btn-control btn-glass-secondary" title="Reactions">
+              <div className="reactions-popover-wrapper" style={{ position: 'relative' }}>
+                <button
+                  className="btn btn-control btn-glass-secondary"
+                  title="Reactions"
+                  onClick={() => { setShowReactionsPopover(v => !v); setShowLeavePopover(false); setShowLayoutPopover(false); }}
+                >
                   <Smile size={16} />
                 </button>
-                <div className="reactions-popover">
-                  {['👍', '❤️', '👏', '😂', '🎉'].map(emoji => (
-                    <button key={emoji} onClick={() => sendReaction(emoji)} className="popover-emoji-btn">
-                      {emoji}
-                    </button>
-                  ))}
-                </div>
+                {showReactionsPopover && (
+                  <div className="reactions-popover" style={{ display: 'flex' }}>
+                    {['👍', '❤️', '👏', '😂', '🎉'].map(emoji => (
+                      <button key={emoji} onClick={() => { sendReaction(emoji); setShowReactionsPopover(false); }} className="popover-emoji-btn">
+                        {emoji}
+                      </button>
+                    ))}
+                  </div>
+                )}
               </div>
 
-              <div className="layouts-popover-wrapper">
-                <button className="btn btn-control btn-glass-secondary" title="Switch Layout">
+              <div className="layouts-popover-wrapper" style={{ position: 'relative' }}>
+                <button
+                  className="btn btn-control btn-glass-secondary"
+                  title="Switch Layout"
+                  onClick={() => { setShowLayoutPopover(v => !v); setShowReactionsPopover(false); setShowLeavePopover(false); }}
+                >
                   <Layout size={16} />
                 </button>
-                <div className="layouts-popover">
-                  <button onClick={() => setLayout('gallery')} className={`layout-pop-btn ${layout === 'gallery' ? 'active' : ''}`}>Gallery Grid</button>
-                  <button onClick={() => setLayout('speaker')} className={`layout-pop-btn ${layout === 'speaker' ? 'active' : ''}`}>Speaker Spotlight</button>
-                  {sharingScreen && (
-                    <button onClick={() => setLayout('screenshare')} className={`layout-pop-btn ${layout === 'screenshare' ? 'active' : ''}`}>Screen Focus</button>
-                  )}
-                </div>
+                {showLayoutPopover && (
+                  <div className="layouts-popover" style={{ display: 'flex' }}>
+                    <button onClick={() => { setLayout('gallery'); setShowLayoutPopover(false); }} className={`layout-pop-btn ${layout === 'gallery' ? 'active' : ''}`}>Gallery Grid</button>
+                    <button onClick={() => { setLayout('speaker'); setShowLayoutPopover(false); }} className={`layout-pop-btn ${layout === 'speaker' ? 'active' : ''}`}>Speaker Spotlight</button>
+                    {sharingScreen && (
+                      <button onClick={() => { setLayout('screenshare'); setShowLayoutPopover(false); }} className={`layout-pop-btn ${layout === 'screenshare' ? 'active' : ''}`}>Screen Focus</button>
+                    )}
+                  </div>
+                )}
               </div>
 
               <button 
@@ -1456,16 +1471,22 @@ export default function VirtualRoom({ group, currentStudent, allStudents, socket
                 <MessageSquare size={16} />
               </button>
 
-              <div className="leave-popover-wrapper">
-                <button className="btn btn-danger btn-control" title="Leave Call">
+              <div className="leave-popover-wrapper" style={{ position: 'relative' }}>
+                <button
+                  className="btn btn-danger btn-control"
+                  title="Leave Call"
+                  onClick={() => { setShowLeavePopover(v => !v); setShowReactionsPopover(false); setShowLayoutPopover(false); }}
+                >
                   <PhoneOff size={16} />
                 </button>
-                <div className="leave-popover">
-                  <button onClick={() => handleLeaveCall(false)} className="leave-pop-btn">Leave Call</button>
-                  {isAdmin && (
-                    <button onClick={() => handleLeaveCall(true)} className="leave-pop-btn danger">End Call For All</button>
-                  )}
-                </div>
+                {showLeavePopover && (
+                  <div className="leave-popover" style={{ display: 'flex' }}>
+                    <button onClick={() => { handleLeaveCall(false); setShowLeavePopover(false); }} className="leave-pop-btn">Leave Call</button>
+                    {isAdmin && (
+                      <button onClick={() => { handleLeaveCall(true); setShowLeavePopover(false); }} className="leave-pop-btn danger">End Call For All</button>
+                    )}
+                  </div>
+                )}
               </div>
             </div>
 
@@ -1629,7 +1650,7 @@ export default function VirtualRoom({ group, currentStudent, allStudents, socket
       {/* Floating Emoji Reactions Overlay */}
       <div className="floating-reactions-container">
         {reactions.map(r => (
-          <div key={r.id} className="floating-reaction" style={{ left: `${r.left}%` }}>
+          <div key={r.id} className="floating-reaction" style={{ left: `${r.left}%`, pointerEvents: 'none' }}>
             <span className="reaction-emoji">{r.emoji}</span>
             <span className="reaction-name">{r.name}</span>
           </div>
