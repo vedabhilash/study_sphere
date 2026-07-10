@@ -136,8 +136,9 @@
   justify-content: space-between;
 }
 
-.profile-toggle-content {
-  display: contents;
+.sidebar-link .profile-toggle-content {
+  flex: 1;
+  display: flex;
 }
 
 .profile-toggle-label {
