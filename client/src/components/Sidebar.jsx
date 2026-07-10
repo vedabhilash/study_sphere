@@ -80,9 +80,9 @@ const Sidebar = ({ isOpen, onClose }) => {
                 className={`sidebar-link dropdown-toggle ${profileExpanded ? 'expanded' : ''}`}
                 onClick={() => setProfileExpanded(!profileExpanded)}
               >
-                <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
+                <div className="profile-toggle-content">
                   <User size={18} />
-                  <span>Profile</span>
+                  <span className="profile-toggle-label">Profile</span>
                 </div>
                 {profileExpanded ? <ChevronUp size={14} /> : <ChevronDown size={14} />}
               </button>
