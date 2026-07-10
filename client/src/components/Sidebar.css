@@ -126,6 +126,8 @@
 .sidebar-dropdown-wrapper {
   display: flex;
   flex-direction: column;
+  order: 1;
+  margin-top: 4px;
 }
 
 .dropdown-toggle {
