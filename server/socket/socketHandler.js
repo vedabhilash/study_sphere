@@ -13,6 +13,9 @@ const socketHandler = (io) => {
       if (userId) {
         onlineUsers.set(userId, socket.id);
         socket.userId = userId;
+        // Join a personal room named after the userId so signals can be
+        // delivered reliably without a fragile socket-ID lookup.
+        socket.join(userId);
         
         // Broadcast presence update
         io.emit('userStatusUpdate', {
@@ -64,11 +67,11 @@ const socketHandler = (io) => {
     });
 
     // WebRTC signaling for peer-to-peer video calls
+    // Use room-based delivery (io.to(targetId)) instead of a socket-ID
+    // lookup so signals are never silently dropped due to race conditions
+    // or reconnections.
     socket.on('videoCallSignal', ({ targetId, signal, senderId }) => {
-      const receiverSocketId = onlineUsers.get(targetId);
-      if (receiverSocketId) {
-        io.to(receiverSocketId).emit('incomingVideoCallSignal', { senderId, signal });
-      }
+      io.to(targetId).emit('incomingVideoCallSignal', { senderId, signal });
     });
 
     // User joins meeting room
@@ -100,9 +103,18 @@ const socketHandler = (io) => {
       io.to(`${groupId}-meeting`).emit('receiveMeetingMessage', message);
     });
 
-    // Host control commands (mute, remove, lock, end meeting)
-    socket.on('meetingControl', ({ groupId, command, targetId, value }) => {
-      io.to(`${groupId}-meeting`).emit('incomingMeetingControl', { command, targetId, value });
+    // Relay whiteboard draw strokes
+    socket.on('draw', ({ groupId, strokeData }) => {
+      if (groupId) {
+        socket.to(groupId).emit('incomingDraw', strokeData);
+      }
+    });
+
+    // Clear whiteboard request
+    socket.on('clearBoard', ({ groupId }) => {
+      if (groupId) {
+        socket.to(groupId).emit('incomingClearBoard');
+      }
     });
 
     // Disconnect
