@@ -61,8 +61,8 @@
 }
 
 .group-tab-btn.active {
-  color: var(--primary-light);
-  border-bottom-color: var(--primary);
+  color: #ffffff;
+  border-bottom-color: #ffffff;
 }
 
 /* Chat Styling */
@@ -70,7 +70,7 @@
   display: flex;
   flex-direction: column;
   height: 600px;
-  background: rgba(10, 14, 26, 0.3);
+  background: #080808;
   border: 1px solid var(--border-color);
   border-radius: var(--radius-md);
   overflow: hidden;
@@ -130,8 +130,8 @@
 }
 
 .chat-bubble-container.me .chat-bubble-body {
-  background: linear-gradient(135deg, var(--primary) 0%, var(--primary-hover) 100%);
-  color: white;
+  background: #ffffff;
+  color: #000000;
   border-top-right-radius: 0;
 }
 
@@ -155,7 +155,7 @@
 }
 
 .chat-attachment-link {
-  color: var(--accent);
+  color: #ffffff;
   text-decoration: underline;
   display: flex;
   align-items: center;
@@ -204,7 +204,7 @@
 }
 
 .resource-card:hover {
-  border-color: var(--primary);
+  border-color: #ffffff;
   background: var(--bg-card-hover);
 }
 
@@ -269,8 +269,8 @@
 
 .session-time {
   font-size: 0.85rem;
-  color: var(--accent);
-  font-weight: 500;
+  color: #ffffff;
+  font-weight: 700;
   display: flex;
   align-items: center;
   gap: 6px;

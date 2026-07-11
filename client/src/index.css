@@ -1,37 +1,37 @@
 /* Design Tokens & Theme Variables */
 :root {
-  --bg-primary: #ffffff;
-  --bg-secondary: #f8f9fa;
-  --bg-card: #ffffff;
-  --bg-card-hover: #f1f3f5;
+  --bg-primary: #000000;
+  --bg-secondary: #080808;
+  --bg-card: #121212;
+  --bg-card-hover: #1a1a1a;
   
-  --text-primary: #12141d;
-  --text-secondary: #5c6873;
-  --text-muted: #88929d;
+  --text-primary: #ffffff;
+  --text-secondary: #a3a3a3;
+  --text-muted: #737373;
   
-  --primary: #dc1e2a;
-  --primary-hover: #be131e;
-  --primary-light: #ff4d5a;
-  --primary-glow: rgba(220, 30, 42, 0.15);
+  --primary: #ffffff;
+  --primary-hover: #d4d4d4;
+  --primary-light: #ffffff;
+  --primary-glow: rgba(255, 255, 255, 0.08);
   
-  --accent: #13b55c;
-  --accent-glow: rgba(19, 181, 92, 0.15);
+  --accent: #ffffff;
+  --accent-glow: rgba(255, 255, 255, 0.05);
   
-  --success: #13b55c;
-  --success-glow: rgba(19, 181, 92, 0.15);
-  --danger: #dc1e2a;
-  --danger-glow: rgba(220, 30, 42, 0.15);
-  --warning: #f59e0b;
+  --success: #ffffff;
+  --success-glow: rgba(255, 255, 255, 0.05);
+  --danger: #e5e5e5;
+  --danger-glow: rgba(255, 255, 255, 0.05);
+  --warning: #a3a3a3;
   
-  --border-color: #e3e6eb;
-  --border-color-hover: #ced4da;
+  --border-color: #262626;
+  --border-color-hover: #404040;
   
-  --glass-bg: rgba(255, 255, 255, 0.9);
-  --glass-border: #e3e6eb;
-  --glass-shadow: rgba(0, 0, 0, 0.05);
+  --glass-bg: rgba(18, 18, 18, 0.8);
+  --glass-border: #262626;
+  --glass-shadow: rgba(0, 0, 0, 0.5);
   
-  --font-sans: system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Arial, sans-serif;
-  --font-display: system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Arial, sans-serif;
+  --font-sans: "Outfit", system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Arial, sans-serif;
+  --font-display: "Outfit", system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Arial, sans-serif;
   
   --radius-sm: 4px;
   --radius-md: 8px;
@@ -82,6 +82,7 @@ button, input, textarea, select {
 ::-webkit-scrollbar-thumb {
   background: var(--bg-card);
   border-radius: var(--radius-full);
+  border: 2px solid var(--bg-primary);
 }
 
 ::-webkit-scrollbar-thumb:hover {
@@ -101,7 +102,7 @@ button, input, textarea, select {
 
 @keyframes pulseGlow {
   0%, 100% { box-shadow: 0 0 15px var(--primary-glow); }
-  50% { box-shadow: 0 0 25px rgba(174, 255, 0, 0.45); }
+  50% { box-shadow: 0 0 25px rgba(255, 255, 255, 0.2); }
 }
 
 .animate-fade-in {
@@ -118,9 +119,9 @@ h1, h2, h3, h4, h5, h6 {
 
 /* Glassmorphism Layout Elements */
 .glass-panel {
-  background: #ffffff;
+  background: var(--bg-card);
   border: 1px solid var(--border-color);
-  box-shadow: 0 4px 20px rgba(0, 0, 0, 0.05);
+  box-shadow: 0 4px 20px rgba(0, 0, 0, 0.5);
   border-radius: var(--radius-md);
 }
 
@@ -136,7 +137,7 @@ h1, h2, h3, h4, h5, h6 {
   border-color: var(--border-color-hover);
   background: var(--bg-card-hover);
   transform: translateY(-2px);
-  box-shadow: 0 10px 20px rgba(0, 0, 0, 0.06);
+  box-shadow: 0 10px 20px rgba(0, 0, 0, 0.4);
 }
 
 /* Inputs */
@@ -155,7 +156,7 @@ h1, h2, h3, h4, h5, h6 {
 .form-input {
   width: 100%;
   padding: 12px 16px;
-  background: rgba(10, 14, 26, 0.6);
+  background: #080808;
   border: 1px solid var(--border-color);
   border-radius: var(--radius-sm);
   color: var(--text-primary);
@@ -165,9 +166,9 @@ h1, h2, h3, h4, h5, h6 {
 
 .form-input:focus {
   outline: none;
-  border-color: var(--primary);
-  box-shadow: 0 0 0 3px var(--primary-glow);
-  background: rgba(10, 14, 26, 0.8);
+  border-color: #ffffff;
+  box-shadow: 0 0 0 2px rgba(255, 255, 255, 0.2);
+  background: #000000;
 }
 
 /* Buttons */
@@ -182,55 +183,67 @@ h1, h2, h3, h4, h5, h6 {
   border-radius: var(--radius-sm);
   cursor: pointer;
   transition: all var(--transition-fast);
-  border: none;
+  border: 1px solid transparent;
 }
 
 .btn-primary {
-  background: linear-gradient(135deg, var(--primary) 0%, var(--primary-hover) 100%);
-  color: #080a0f;
-  box-shadow: 0 4px 14px var(--primary-glow);
+  background: #ffffff;
+  color: #000000;
+  border-color: #ffffff;
 }
 
 .btn-primary:hover {
+  background: #000000;
+  color: #ffffff;
+  border-color: #ffffff;
   transform: translateY(-1px);
-  box-shadow: 0 6px 20px rgba(174, 255, 0, 0.35);
+  box-shadow: 0 4px 12px rgba(255, 255, 255, 0.15);
 }
 
 .btn-secondary {
-  background: var(--bg-card);
+  background: #121212;
   border: 1px solid var(--border-color);
   color: var(--text-primary);
 }
 
 .btn-secondary:hover {
-  background: var(--bg-card-hover);
-  border-color: var(--border-color-hover);
+  background: #ffffff;
+  color: #000000;
+  border-color: #ffffff;
+  transform: translateY(-1px);
+  box-shadow: 0 4px 12px rgba(255, 255, 255, 0.15);
 }
 
 .btn-danger {
-  background: linear-gradient(135deg, var(--danger) 0%, #b91c1c 100%);
-  color: white;
-  box-shadow: 0 4px 14px var(--danger-glow);
+  background: #121212;
+  color: #ffffff;
+  border: 1px solid #404040;
 }
 
 .btn-danger:hover {
+  background: #e5e5e5;
+  color: #000000;
+  border-color: #e5e5e5;
   transform: translateY(-1px);
-  box-shadow: 0 6px 20px rgba(239, 68, 68, 0.4);
+  box-shadow: 0 4px 12px rgba(255, 255, 255, 0.1);
 }
 
 .btn-accent {
-  background: linear-gradient(135deg, var(--accent) 0%, #0891b2 100%);
-  color: white;
-  box-shadow: 0 4px 14px var(--accent-glow);
+  background: #ffffff;
+  color: #000000;
+  border: 1px solid #ffffff;
 }
 
 .btn-accent:hover {
+  background: #000000;
+  color: #ffffff;
+  border-color: #ffffff;
   transform: translateY(-1px);
-  box-shadow: 0 6px 20px rgba(6, 182, 212, 0.4);
+  box-shadow: 0 4px 12px rgba(255, 255, 255, 0.15);
 }
 
 .btn:disabled {
-  opacity: 0.6;
+  opacity: 0.4;
   cursor: not-allowed;
   transform: none !important;
   box-shadow: none !important;
@@ -246,15 +259,15 @@ h1, h2, h3, h4, h5, h6 {
   font-weight: 600;
   text-transform: uppercase;
   letter-spacing: 0.05em;
-  background: rgba(174, 255, 0, 0.08);
-  color: var(--primary-light);
-  border: 1px solid rgba(174, 255, 0, 0.15);
+  background: #1a1a1a;
+  color: #ffffff;
+  border: 1px solid #404040;
 }
 
 .tag-badge-accent {
-  background: rgba(6, 182, 212, 0.15);
-  color: #22d3ee;
-  border: 1px solid rgba(6, 182, 212, 0.2);
+  background: #ffffff;
+  color: #000000;
+  border: 1px solid #ffffff;
 }
 
 /* Modals */
