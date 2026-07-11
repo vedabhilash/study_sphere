@@ -84,6 +84,36 @@ const userSchema = new mongoose.Schema({
     type: mongoose.Schema.Types.ObjectId,
     ref: 'Group'
   }],
+  skillsCanTeach: [{
+    name: { type: String, required: true },
+    category: { type: String, required: true },
+    level: { type: String, enum: ['Beginner', 'Intermediate', 'Advanced', 'Expert'], default: 'Intermediate' }
+  }],
+  skillsToLearn: [{
+    name: { type: String, required: true },
+    category: { type: String, required: true },
+    priority: { type: String, enum: ['Low', 'Medium', 'High'], default: 'Medium' }
+  }],
+  rating: {
+    type: Number,
+    default: 0
+  },
+  completedSessions: {
+    type: Number,
+    default: 0
+  },
+  credits: {
+    type: Number,
+    default: 100
+  },
+  languages: {
+    type: [String],
+    default: ['English']
+  },
+  mentorBadges: {
+    type: [String],
+    default: []
+  },
   createdAt: {
     type: Date,
     default: Date.now

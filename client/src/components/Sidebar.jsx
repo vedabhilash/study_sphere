@@ -15,7 +15,9 @@ import {
   Settings, 
   LogOut,
   ChevronDown,
-  ChevronUp
+  ChevronUp,
+  Compass,
+  RefreshCw
 } from 'lucide-react';
 import './Sidebar.css';
 
@@ -120,6 +122,15 @@ const Sidebar = ({ isOpen, onClose }) => {
                     <span className="bullet">•</span>
                     <span>Privacy & Visibility</span>
                   </NavLink>
+
+                  <NavLink 
+                    to="/profile/skills" 
+                    className={({ isActive }) => `sidebar-sublink ${isActive ? 'active' : ''}`}
+                    onClick={handleLinkClick}
+                  >
+                    <span className="bullet">•</span>
+                    <span>My Skills</span>
+                  </NavLink>
                 </div>
               )}
             </div>
@@ -140,6 +151,24 @@ const Sidebar = ({ isOpen, onClose }) => {
             >
               <Users size={18} />
               <span>Group Directory</span>
+            </NavLink>
+
+            <NavLink 
+              to="/marketplace" 
+              className={({ isActive }) => `sidebar-link ${isActive ? 'active' : ''}`}
+              onClick={handleLinkClick}
+            >
+              <Compass size={18} />
+              <span>Skill Marketplace</span>
+            </NavLink>
+
+            <NavLink 
+              to="/requests" 
+              className={({ isActive }) => `sidebar-link ${isActive ? 'active' : ''}`}
+              onClick={handleLinkClick}
+            >
+              <RefreshCw size={18} />
+              <span>Swap Requests</span>
             </NavLink>
 
             <NavLink 

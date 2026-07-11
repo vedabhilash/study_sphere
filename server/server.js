@@ -57,6 +57,7 @@ app.use('/uploads', express.static(path.join(__dirname, 'uploads')));
 app.use('/api/auth', require('./routes/authRoutes'));
 app.use('/api/groups', require('./routes/groupRoutes'));
 app.use('/api/resources', require('./routes/resourceRoutes'));
+app.use('/api', require('./routes/skillsRoutes'));
 
 // Root path check
 app.get('/api/health', (req, res) => {

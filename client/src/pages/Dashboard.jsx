@@ -12,7 +12,8 @@ import {
   Globe, 
   PlusCircle, 
   MessageSquare, 
-  FileText 
+  FileText,
+  Award
 } from 'lucide-react';
 import './Dashboard.css';
 
@@ -98,7 +99,7 @@ const Dashboard = () => {
         </div>
 
         {/* Stats Grid */}
-        <div className="stats-grid">
+        <div className="stats-grid" style={{ display: 'grid', gridTemplateColumns: 'repeat(4, 1fr)', gap: '16px' }}>
           <div className="stat-card">
             <div className="stat-icon">
               <Users size={24} />
@@ -126,6 +127,16 @@ const Dashboard = () => {
             <div className="stat-info">
               <span className="stat-value">{totalMembers}</span>
               <span className="stat-label">Total Peers</span>
+            </div>
+          </div>
+
+          <div className="stat-card">
+            <div className="stat-icon" style={{ background: 'rgba(255, 255, 255, 0.1)', color: '#ffffff' }}>
+              <PlusCircle size={24} />
+            </div>
+            <div className="stat-info">
+              <span className="stat-value">{user.credits || 0} CR</span>
+              <span className="stat-label">Skill Credits</span>
             </div>
           </div>
         </div>
@@ -241,8 +252,8 @@ const Dashboard = () => {
           </div>
 
           {/* Right Side: Upcoming Sessions Sidebar */}
-          <div>
-            <div className="glass-panel" style={{ padding: '24px', height: '100%' }}>
+          <div style={{ display: 'flex', flexDirection: 'column', gap: '24px' }}>
+            <div className="glass-panel" style={{ padding: '24px' }}>
               <h2 className="dashboard-panel-title">
                 <Calendar size={18} style={{ color: 'var(--success)' }} />
                 <span>Upcoming Sessions</span>
@@ -283,6 +294,55 @@ const Dashboard = () => {
                   })}
                 </div>
               )}
+            </div>
+
+            {/* Skill Analytics Panel */}
+            <div className="glass-panel" style={{ padding: '24px' }}>
+              <h2 className="dashboard-panel-title">
+                <Award size={18} style={{ color: '#ffffff' }} />
+                <span>Skill Swap Analytics</span>
+              </h2>
+              
+              <div style={{ display: 'flex', flexDirection: 'column', gap: '14px', marginTop: '16px' }}>
+                <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '12px' }}>
+                  <div style={{ background: '#121212', border: '1px solid var(--border-color)', padding: '12px', borderRadius: '4px', textAlign: 'center' }}>
+                    <span style={{ fontSize: '1.25rem', fontWeight: 800, color: '#fff', display: 'block' }}>{user.skillsCanTeach?.length || 0}</span>
+                    <span style={{ fontSize: '0.7rem', color: 'var(--text-secondary)' }}>Skills Taught</span>
+                  </div>
+                  <div style={{ background: '#121212', border: '1px solid var(--border-color)', padding: '12px', borderRadius: '4px', textAlign: 'center' }}>
+                    <span style={{ fontSize: '1.25rem', fontWeight: 800, color: '#fff', display: 'block' }}>{user.skillsToLearn?.length || 0}</span>
+                    <span style={{ fontSize: '0.7rem', color: 'var(--text-secondary)' }}>Skills Learning</span>
+                  </div>
+                </div>
+
+                <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '12px' }}>
+                  <div style={{ background: '#121212', border: '1px solid var(--border-color)', padding: '12px', borderRadius: '4px', textAlign: 'center' }}>
+                    <span style={{ fontSize: '1.25rem', fontWeight: 800, color: '#fff', display: 'block' }}>{user.completedSessions || 0} hrs</span>
+                    <span style={{ fontSize: '0.7rem', color: 'var(--text-secondary)' }}>Mentored Time</span>
+                  </div>
+                  <div style={{ background: '#121212', border: '1px solid var(--border-color)', padding: '12px', borderRadius: '4px', textAlign: 'center' }}>
+                    <span style={{ fontSize: '1.25rem', fontWeight: 800, color: '#fff', display: 'block' }}>★ {user.rating > 0 ? user.rating : 'N/A'}</span>
+                    <span style={{ fontSize: '0.7rem', color: 'var(--text-secondary)' }}>Mentor Rating</span>
+                  </div>
+                </div>
+
+                <div style={{ borderTop: '1px solid var(--border-color)', paddingTop: '12px' }}>
+                  <span style={{ fontSize: '0.8rem', color: 'var(--text-secondary)', textTransform: 'uppercase', fontWeight: 600 }}>Top Badges</span>
+                  {user.mentorBadges && user.mentorBadges.length > 0 ? (
+                    <div style={{ display: 'flex', flexWrap: 'wrap', gap: '6px', marginTop: '8px' }}>
+                      {user.mentorBadges.slice(0, 3).map(badge => (
+                        <span key={badge} className="tag-badge" style={{ fontSize: '0.7rem', background: '#ffffff', color: '#000000', fontWeight: 'bold' }}>{badge}</span>
+                      ))}
+                    </div>
+                  ) : (
+                    <span style={{ fontSize: '0.8rem', color: 'var(--text-muted)', display: 'block', marginTop: '4px' }}>No badges earned yet.</span>
+                  )}
+                </div>
+
+                <Link to="/marketplace" className="btn btn-secondary" style={{ width: '100%', textAlign: 'center', display: 'block', padding: '8px', fontSize: '0.85rem' }}>
+                  Browse Marketplace
+                </Link>
+              </div>
             </div>
           </div>
 

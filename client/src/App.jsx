@@ -18,6 +18,11 @@ import MyCourses from './pages/profile/MyCourses';
 import StudyPreferences from './pages/profile/StudyPreferences';
 import WeeklyAvailability from './pages/profile/WeeklyAvailability';
 import PrivacyVisibility from './pages/profile/PrivacyVisibility';
+import MySkills from './pages/profile/MySkills';
+
+// Marketplace Pages
+import SkillMarketplace from './pages/SkillMarketplace';
+import ExchangeRequests from './pages/ExchangeRequests';
 
 // Placeholders
 import MatchFinder from './pages/MatchFinder';
@@ -65,9 +70,12 @@ function AppContent() {
               <Route path="/profile/preferences" element={<ProtectedRoute><StudyPreferences /></ProtectedRoute>} />
               <Route path="/profile/availability" element={<ProtectedRoute><WeeklyAvailability /></ProtectedRoute>} />
               <Route path="/profile/privacy" element={<ProtectedRoute><PrivacyVisibility /></ProtectedRoute>} />
+              <Route path="/profile/skills" element={<ProtectedRoute><MySkills /></ProtectedRoute>} />
               
               {/* Other Navigation routes */}
               <Route path="/match-finder" element={<ProtectedRoute><MatchFinder /></ProtectedRoute>} />
+              <Route path="/marketplace" element={<ProtectedRoute><SkillMarketplace /></ProtectedRoute>} />
+              <Route path="/requests" element={<ProtectedRoute><ExchangeRequests /></ProtectedRoute>} />
               <Route path="/settings" element={<ProtectedRoute><SettingsPage /></ProtectedRoute>} />
               
               {/* Catch-all redirect */}
