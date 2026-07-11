@@ -542,20 +542,6 @@ export default function VirtualRoom({ group, currentStudent, allStudents, socket
         online: true
       }
     });
-
-    if (socket) {
-      // Emit join meeting presence
-      socket.emit('joinMeeting', {
-        groupId: group.id,
-        student: {
-          id: currentStudent.id,
-          name: currentStudent.name,
-          avatar: currentStudent.avatar,
-          micOn,
-          videoOn: activeStream ? activeStream.getVideoTracks().length > 0 : false
-        }
-      });
-    }
   };
 
   // Leave Call handler

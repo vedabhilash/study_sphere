@@ -348,83 +348,85 @@ const GroupDetailsPage = () => {
   });
 
   return (
-    <div className="main-content animate-fade-in">
-      <div className="group-details-layout">
+    <div className={`main-content animate-fade-in ${activeTab === 'virtual' ? 'virtual-main-content' : ''}`}>
+      <div className={`group-details-layout ${activeTab === 'virtual' ? 'virtual-active' : ''}`}>
         
         {/* Left Side: Group Info Sidebar */}
-        <div className="group-sidebar">
-          <div className="glass-panel" style={{ padding: '24px' }}>
-            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start' }}>
-              <span className="tag-badge" style={{ fontSize: '0.7rem' }}>{group.subject}</span>
-              {group.isPrivate ? (
-                <span title="Private Group" style={{ color: 'var(--text-muted)' }}><Lock size={16} /></span>
-              ) : (
-                <span title="Public Group" style={{ color: 'var(--text-muted)' }}><Globe size={16} /></span>
-              )}
-            </div>
-            
-            <h2 style={{ fontSize: '1.4rem', marginTop: '12px', fontWeight: 800 }}>{group.name}</h2>
-            <p style={{ color: 'var(--text-secondary)', fontSize: '0.9rem', marginTop: '8px', lineBreak: 'anywhere' }}>
-              {group.description || 'No description provided.'}
-            </p>
-
-            {/* Invite code (if private, or public for easy sharing) */}
-            {group.inviteCode && (
-              <div style={{ marginTop: '20px', background: 'rgba(6, 182, 212, 0.05)', padding: '12px', borderRadius: 'var(--radius-sm)', border: '1px solid rgba(6, 182, 212, 0.1)' }}>
-                <span style={{ fontSize: '0.75rem', textTransform: 'uppercase', color: 'var(--accent)', fontWeight: 600, display: 'flex', alignItems: 'center', gap: '4px' }}>
-                  <Key size={12} />
-                  <span>Invite Code</span>
-                </span>
-                <p style={{ fontSize: '1.2rem', fontFamily: 'var(--font-display)', fontWeight: 800, marginTop: '4px', letterSpacing: '0.05em', color: 'var(--text-primary)' }}>
-                  {group.inviteCode}
-                </p>
+        {activeTab !== 'virtual' && (
+          <div className="group-sidebar">
+            <div className="glass-panel" style={{ padding: '24px' }}>
+              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start' }}>
+                <span className="tag-badge" style={{ fontSize: '0.7rem' }}>{group.subject}</span>
+                {group.isPrivate ? (
+                  <span title="Private Group" style={{ color: 'var(--text-muted)' }}><Lock size={16} /></span>
+                ) : (
+                  <span title="Public Group" style={{ color: 'var(--text-muted)' }}><Globe size={16} /></span>
+                )}
               </div>
-            )}
+              
+              <h2 style={{ fontSize: '1.4rem', marginTop: '12px', fontWeight: 800 }}>{group.name}</h2>
+              <p style={{ color: 'var(--text-secondary)', fontSize: '0.9rem', marginTop: '8px', lineBreak: 'anywhere' }}>
+                {group.description || 'No description provided.'}
+              </p>
 
-            {/* Leave button */}
-            <button 
-              onClick={handleLeaveGroup} 
-              className="btn btn-secondary" 
-              style={{ width: '100%', marginTop: '24px', justifyContent: 'center', color: 'var(--danger)', borderColor: 'rgba(239, 68, 68, 0.2)' }}
-            >
-              <LogOut size={16} />
-              <span>Leave Group</span>
-            </button>
-          </div>
-
-          {/* Members list */}
-          <div className="glass-panel" style={{ padding: '24px' }}>
-            <h3 style={{ fontSize: '1rem', fontWeight: 700, display: 'flex', alignItems: 'center', gap: '8px', borderBottom: '1px solid var(--border-color)', paddingBottom: '8px', marginBottom: '16px' }}>
-              <Users size={16} style={{ color: 'var(--primary)' }} />
-              <span>Members ({group.members?.length || 0})</span>
-            </h3>
-            
-            <div style={{ display: 'flex', flexDirection: 'column', gap: '12px' }}>
-              {group.members?.map((member) => (
-                <div key={member._id} style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
-                  <img 
-                    src={member.avatar || 'https://via.placeholder.com/150'} 
-                    alt={member.name} 
-                    style={{ width: '32px', height: '32px', borderRadius: '50%', border: '1px solid var(--border-color)' }}
-                  />
-                  <div>
-                    <p style={{ fontSize: '0.9rem', fontWeight: 600, color: 'var(--text-primary)' }}>
-                      {member.name}
-                      {member._id === group.admin?._id && (
-                        <span style={{ fontSize: '0.7rem', color: 'var(--accent)', background: 'rgba(6, 182, 212, 0.1)', padding: '2px 6px', borderRadius: '4px', marginLeft: '6px', fontWeight: 600 }}>
-                          Admin
-                        </span>
-                      )}
-                    </p>
-                  </div>
+              {/* Invite code (if private, or public for easy sharing) */}
+              {group.inviteCode && (
+                <div style={{ marginTop: '20px', background: 'rgba(6, 182, 212, 0.05)', padding: '12px', borderRadius: 'var(--radius-sm)', border: '1px solid rgba(6, 182, 212, 0.1)' }}>
+                  <span style={{ fontSize: '0.75rem', textTransform: 'uppercase', color: 'var(--accent)', fontWeight: 600, display: 'flex', alignItems: 'center', gap: '4px' }}>
+                    <Key size={12} />
+                    <span>Invite Code</span>
+                  </span>
+                  <p style={{ fontSize: '1.2rem', fontFamily: 'var(--font-display)', fontWeight: 800, marginTop: '4px', letterSpacing: '0.05em', color: 'var(--text-primary)' }}>
+                    {group.inviteCode}
+                  </p>
                 </div>
-              ))}
+              )}
+
+              {/* Leave button */}
+              <button 
+                onClick={handleLeaveGroup} 
+                className="btn btn-secondary" 
+                style={{ width: '100%', marginTop: '24px', justifyContent: 'center', color: 'var(--danger)', borderColor: 'rgba(239, 68, 68, 0.2)' }}
+              >
+                <LogOut size={16} />
+                <span>Leave Group</span>
+              </button>
+            </div>
+
+            {/* Members list */}
+            <div className="glass-panel" style={{ padding: '24px' }}>
+              <h3 style={{ fontSize: '1rem', fontWeight: 700, display: 'flex', alignItems: 'center', gap: '8px', borderBottom: '1px solid var(--border-color)', paddingBottom: '8px', marginBottom: '16px' }}>
+                <Users size={16} style={{ color: 'var(--primary)' }} />
+                <span>Members ({group.members?.length || 0})</span>
+              </h3>
+              
+              <div style={{ display: 'flex', flexDirection: 'column', gap: '12px' }}>
+                {group.members?.map((member) => (
+                  <div key={member._id} style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
+                    <img 
+                      src={member.avatar || 'https://via.placeholder.com/150'} 
+                      alt={member.name} 
+                      style={{ width: '32px', height: '32px', borderRadius: '50%', border: '1px solid var(--border-color)' }}
+                    />
+                    <div>
+                      <p style={{ fontSize: '0.9rem', fontWeight: 600, color: 'var(--text-primary)' }}>
+                        {member.name}
+                        {member._id === group.admin?._id && (
+                          <span style={{ fontSize: '0.7rem', color: 'var(--accent)', background: 'rgba(6, 182, 212, 0.1)', padding: '2px 6px', borderRadius: '4px', marginLeft: '6px', fontWeight: 600 }}>
+                            Admin
+                          </span>
+                        )}
+                      </p>
+                    </div>
+                  </div>
+                ))}
+              </div>
             </div>
           </div>
-        </div>
+        )}
 
         {/* Right Side: Tab Selection Panels */}
-        <div>
+        <div className={activeTab === 'virtual' ? 'virtual-full-width' : ''}>
           {/* Tabs bar */}
           <div className="group-tabs-header">
             <button 
