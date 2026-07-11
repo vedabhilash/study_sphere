@@ -53,8 +53,8 @@
   align-items: center;
   justify-content: space-between;
   padding: 0;
-  background-color: #000000;
-  border-bottom: 2px solid #111111;
+  background-color: #ffffff;
+  border-bottom: 2px solid #e3e6eb;
   height: 60px;
 }
 
@@ -68,7 +68,7 @@
 .mobile-toggle-btn {
   background: transparent;
   border: none;
-  color: #ffffff;
+  color: #12141d;
   cursor: pointer;
   display: flex;
   align-items: center;
@@ -79,7 +79,7 @@
 }
 
 .mobile-toggle-btn:hover {
-  background-color: rgba(255, 255, 255, 0.08);
+  background-color: rgba(0, 0, 0, 0.05);
 }
 
 .mobile-brand-container {
@@ -100,7 +100,7 @@
   font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
   font-size: 1.15rem;
   font-weight: 800;
-  color: #ffffff;
+  color: #12141d;
   letter-spacing: 1px;
 }
 
@@ -141,8 +141,8 @@
 }
 
 .premium-modal {
-  background-color: #0b0e14;
-  border: 1.5px solid #222222;
+  background-color: #ffffff;
+  border: 1.5px solid #e3e6eb;
   border-radius: 8px;
   max-width: 400px;
   width: 100%;
@@ -150,7 +150,7 @@
   display: flex;
   flex-direction: column;
   gap: 20px;
-  box-shadow: 0 20px 40px rgba(0, 0, 0, 0.7);
+  box-shadow: 0 20px 40px rgba(0, 0, 0, 0.15);
   animation: fadeIn 0.25s ease-out;
 }
 
@@ -158,7 +158,7 @@
   display: flex;
   align-items: center;
   justify-content: space-between;
-  border-bottom: 1.5px solid #1a2230;
+  border-bottom: 1.5px solid #e3e6eb;
   padding-bottom: 12px;
 }
 
@@ -166,7 +166,7 @@
   font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
   font-size: 1.15rem;
   font-weight: 800;
-  color: #ffffff;
+  color: #12141d;
   letter-spacing: 0.5px;
   margin: 0;
 }
@@ -212,7 +212,7 @@
 .premium-price-value {
   font-size: 2rem;
   font-weight: 900;
-  color: #ffffff;
+  color: #12141d;
   margin: 0;
   font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
 }
@@ -220,7 +220,7 @@
 .price-period {
   font-size: 0.9rem;
   font-weight: 400;
-  color: #888888;
+  color: #5c6873;
 }
 
 .premium-benefits-list {
@@ -237,7 +237,7 @@
   align-items: center;
   gap: 10px;
   font-size: 0.9rem;
-  color: #c5c5c5;
+  color: #495057;
 }
 
 .btn-upgrade-confirm {
