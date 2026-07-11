@@ -1,23 +1,74 @@
+.top-header-wrapper {
+  display: flex;
+  flex-direction: column;
+  width: 100%;
+  position: sticky;
+  top: 0;
+  z-index: 100;
+}
+
+/* Green Promo Banner */
+.promo-banner {
+  background-color: #13b55c;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 8px 16px;
+  color: #ffffff;
+  gap: 12px;
+  font-weight: 700;
+  cursor: pointer;
+  transition: background-color var(--transition-fast);
+  text-align: center;
+}
+
+.promo-banner:hover {
+  background-color: #0e9b4d;
+}
+
+.promo-text {
+  font-size: 0.9rem;
+  letter-spacing: 0.5px;
+  text-transform: uppercase;
+  font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+}
+
+.promo-btn {
+  border: 1.5px solid #ffffff;
+  background: transparent;
+  color: #ffffff;
+  padding: 3px 10px;
+  font-weight: 700;
+  font-size: 0.75rem;
+  border-radius: 2px;
+  text-transform: uppercase;
+  cursor: pointer;
+  pointer-events: none;
+  font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+}
+
+/* Main Header */
 .mobile-header {
   display: flex;
   align-items: center;
   justify-content: space-between;
-  padding: 12px 20px;
-  background-color: rgba(18, 24, 41, 0.85);
-  backdrop-filter: blur(16px);
-  -webkit-backdrop-filter: blur(16px);
-  border-bottom: 1px solid var(--border-color);
-  position: sticky;
-  top: 0;
-  width: 100%;
-  z-index: 100;
+  padding: 0;
+  background-color: #000000;
+  border-bottom: 2px solid #111111;
   height: 60px;
+}
+
+.header-left {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding-left: 16px;
 }
 
 .mobile-toggle-btn {
   background: transparent;
   border: none;
-  color: var(--text-primary);
+  color: #ffffff;
   cursor: pointer;
   display: flex;
   align-items: center;
@@ -28,59 +79,194 @@
 }
 
 .mobile-toggle-btn:hover {
-  background-color: rgba(255, 255, 255, 0.05);
+  background-color: rgba(255, 255, 255, 0.08);
 }
 
 .mobile-brand-container {
   display: flex;
   align-items: center;
-  gap: 8px;
+  gap: 4px;
 }
 
-.mobile-brand-logo {
-  color: var(--primary);
-  filter: drop-shadow(0 0 4px var(--primary-glow));
+.brand-primary {
+  font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+  font-size: 1.15rem;
+  font-weight: 500;
+  color: #7b7b7b;
+  letter-spacing: 1px;
 }
 
-.mobile-brand-title {
-  font-family: var(--font-display);
+.brand-accent {
+  font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
   font-size: 1.15rem;
   font-weight: 800;
-  background: linear-gradient(135deg, var(--text-primary) 30%, var(--primary-light) 100%);
-  -webkit-background-clip: text;
-  -webkit-text-fill-color: transparent;
+  color: #ffffff;
+  letter-spacing: 1px;
 }
 
-.mobile-profile-link {
-  display: flex;
-  align-items: center;
+/* Red Get Access Button */
+.btn-get-access {
+  background-color: #dc1e2a;
+  color: #ffffff;
+  border: none;
+  font-weight: 800;
+  font-size: 0.95rem;
+  height: 100%;
+  padding: 0 24px;
+  text-transform: uppercase;
+  cursor: pointer;
+  transition: background-color var(--transition-fast);
+  font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+  letter-spacing: 0.5px;
 }
 
-.mobile-avatar {
-  width: 32px;
-  height: 32px;
-  border-radius: var(--radius-full);
-  border: 1.5px solid var(--border-color);
-  object-fit: cover;
+.btn-get-access:hover {
+  background-color: #be131e;
 }
 
-.mobile-avatar-placeholder {
-  width: 32px;
-  height: 32px;
-  border-radius: var(--radius-full);
-  background: linear-gradient(135deg, var(--primary) 0%, var(--primary-hover) 100%);
-  color: white;
+/* Premium Upgrade Modal */
+.modal-overlay {
+  position: fixed;
+  top: 0;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  background-color: rgba(0, 0, 0, 0.85);
+  z-index: 1000;
   display: flex;
   align-items: center;
   justify-content: center;
-  font-weight: 700;
-  font-size: 0.9rem;
-  border: 1.5px solid rgba(255, 255, 255, 0.15);
+  padding: 20px;
+  backdrop-filter: blur(8px);
 }
 
-/* Hide on desktop viewports */
-@media (min-width: 1024px) {
-  .mobile-header {
-    display: none;
+.premium-modal {
+  background-color: #0b0e14;
+  border: 1.5px solid #222222;
+  border-radius: 8px;
+  max-width: 400px;
+  width: 100%;
+  padding: 24px;
+  display: flex;
+  flex-direction: column;
+  gap: 20px;
+  box-shadow: 0 20px 40px rgba(0, 0, 0, 0.7);
+  animation: fadeIn 0.25s ease-out;
+}
+
+.modal-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  border-bottom: 1.5px solid #1a2230;
+  padding-bottom: 12px;
+}
+
+.modal-title-raw {
+  font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+  font-size: 1.15rem;
+  font-weight: 800;
+  color: #ffffff;
+  letter-spacing: 0.5px;
+  margin: 0;
+}
+
+.text-red {
+  color: #dc1e2a;
+}
+
+.modal-close {
+  background: transparent;
+  border: none;
+  color: #888888;
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  padding: 4px;
+  border-radius: 4px;
+  transition: color var(--transition-fast);
+}
+
+.modal-close:hover {
+  color: #ffffff;
+}
+
+.premium-price-box {
+  background: rgba(220, 30, 42, 0.08);
+  border: 1.5px dashed rgba(220, 30, 42, 0.3);
+  border-radius: 6px;
+  padding: 16px;
+  text-align: center;
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+
+.premium-price-label {
+  font-size: 0.75rem;
+  font-weight: 700;
+  color: #dc1e2a;
+  letter-spacing: 1px;
+}
+
+.premium-price-value {
+  font-size: 2rem;
+  font-weight: 900;
+  color: #ffffff;
+  margin: 0;
+  font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+}
+
+.price-period {
+  font-size: 0.9rem;
+  font-weight: 400;
+  color: #888888;
+}
+
+.premium-benefits-list {
+  list-style: none;
+  padding: 0;
+  margin: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+
+.premium-benefits-list li {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  font-size: 0.9rem;
+  color: #c5c5c5;
+}
+
+.btn-upgrade-confirm {
+  background-color: #dc1e2a;
+  color: #ffffff;
+  border: none;
+  padding: 12px;
+  font-weight: 800;
+  font-size: 0.95rem;
+  border-radius: 4px;
+  cursor: pointer;
+  text-transform: uppercase;
+  transition: background-color var(--transition-fast);
+  text-align: center;
+  font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+  letter-spacing: 0.5px;
+}
+
+.btn-upgrade-confirm:hover {
+  background-color: #be131e;
+}
+
+@keyframes fadeIn {
+  from {
+    opacity: 0;
+    transform: scale(0.95);
+  }
+  to {
+    opacity: 1;
+    transform: scale(1);
   }
 }
