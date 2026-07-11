@@ -57,8 +57,8 @@ const Sidebar = ({ isOpen, onClose }) => {
       <aside className={`sidebar ${isOpen ? 'sidebar-open' : ''}`}>
         <div className="sidebar-header">
           <Link to="/" className="sidebar-brand" onClick={handleLinkClick}>
-            <GraduationCap className="sidebar-brand-logo" size={28} />
-            <span>StudySphere</span>
+            <span className="brand-primary">STUDYSPHERE</span>
+            <span className="brand-accent">RAW</span>
           </Link>
         </div>
 
