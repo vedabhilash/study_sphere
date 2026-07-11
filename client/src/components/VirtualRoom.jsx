@@ -162,6 +162,18 @@ export default function VirtualRoom({ group, currentStudent, allStudents, socket
     return `${m}:${s}`;
   };
 
+  // Toggle full-screen body class when joined/in video call
+  useEffect(() => {
+    if (joined) {
+      document.body.classList.add('meeting-active');
+    } else {
+      document.body.classList.remove('meeting-active');
+    }
+    return () => {
+      document.body.classList.remove('meeting-active');
+    };
+  }, [joined]);
+
   // Setup lobby camera preview
   useEffect(() => {
     let previewStream = null;

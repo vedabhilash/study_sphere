@@ -276,3 +276,33 @@
   gap: 6px;
   margin-bottom: 8px;
 }
+
+/* Full-screen video call layout overrides */
+body.meeting-active .sidebar,
+body.meeting-active .mobile-header,
+body.meeting-active .sidebar-backdrop {
+  display: none !important;
+}
+
+body.meeting-active .main-content-wrapper {
+  padding-left: 0 !important;
+}
+
+body.meeting-active .main-content.virtual-main-content {
+  max-width: 100% !important;
+  padding: 0 !important;
+}
+
+body.meeting-active .group-sidebar {
+  display: none !important;
+}
+
+body.meeting-active .group-tabs-header {
+  display: none !important;
+}
+
+body.meeting-active .active-meeting-container {
+  height: 100vh !important;
+  margin: 0 !important;
+  padding: 12px !important;
+}
