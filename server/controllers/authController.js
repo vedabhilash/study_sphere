@@ -204,11 +204,111 @@ const getMatches = async (req, res) => {
   }
 };
 
+// @desc    Seed mock matching users and align current user profile (production friendly)
+const seedMatchesProduction = async (req, res) => {
+  try {
+    const bcrypt = require('bcryptjs');
+    const salt = await bcrypt.genSalt(10);
+    const hashedPassword = await bcrypt.hash('password123', salt);
+
+    // 1. Clear existing seed users in production DB
+    await User.deleteMany({ email: { $in: ['alice@collabstudy.edu', 'bob@collabstudy.edu', 'clara@collabstudy.edu'] } });
+
+    // 2. Create seed users
+    const seedUsers = [
+      {
+        name: 'Alice Vance',
+        email: 'alice@collabstudy.edu',
+        password: hashedPassword,
+        avatar: '',
+        academicMajor: 'Computer Science',
+        yearOfStudy: '2',
+        university: 'CollabStudy University',
+        bio: 'Coding enthusiast. Love building React web apps and playing tennis.',
+        courses: ['CS 101: Introduction to Programming', 'CS 102: Data Structures', 'MATH 201: Calculus'],
+        weeklyAvailability: {
+          monday: ['Afternoon'],
+          wednesday: ['Morning'],
+          friday: ['Afternoon']
+        },
+        preferredStudyStyle: 'discussion',
+        learningGoals: ['Master React Hooks', 'A grade in Calculus', 'Build full-stack side projects']
+      },
+      {
+        name: 'Bob Smith',
+        email: 'bob@collabstudy.edu',
+        password: hashedPassword,
+        avatar: '',
+        academicMajor: 'Computer Science',
+        yearOfStudy: '3',
+        university: 'CollabStudy University',
+        bio: 'Focusing on algorithmic problem solving. Prefer visual notes.',
+        courses: ['CS 102: Data Structures'],
+        weeklyAvailability: {
+          monday: ['Morning', 'Afternoon'],
+          tuesday: ['Afternoon'],
+          thursday: ['Morning']
+        },
+        preferredStudyStyle: 'visual',
+        learningGoals: ['Understand Graph algorithms', 'Contribute to open source']
+      },
+      {
+        name: 'Clara Jones',
+        email: 'clara@collabstudy.edu',
+        password: hashedPassword,
+        avatar: '',
+        academicMajor: 'Mathematics',
+        yearOfStudy: '1',
+        university: 'CollabStudy University',
+        bio: 'First year math student. Looking for intensive study sessions.',
+        courses: ['MATH 201: Calculus'],
+        weeklyAvailability: {
+          friday: ['Afternoon', 'Evening'],
+          saturday: ['Morning']
+        },
+        preferredStudyStyle: 'intensive',
+        learningGoals: ['Score high in Calculus limits', 'Learn basic Python']
+      }
+    ];
+
+    await User.insertMany(seedUsers);
+
+    // 3. Update current user's profile to align
+    const currentUser = await User.findById(req.user.id);
+    if (currentUser) {
+      currentUser.academicMajor = 'Computer Science';
+      currentUser.yearOfStudy = '2';
+      currentUser.courses = [
+        'CS 101: Introduction to Programming',
+        'CS 102: Data Structures',
+        'MATH 201: Calculus'
+      ];
+      currentUser.weeklyAvailability = {
+        monday: ['Afternoon'],
+        wednesday: ['Morning'],
+        friday: ['Afternoon']
+      };
+      currentUser.preferredStudyStyle = 'discussion';
+      currentUser.learningGoals = ['Master React Hooks', 'A grade in Calculus', 'Build full-stack side projects'];
+      await currentUser.save();
+    }
+
+    res.status(200).json({
+      success: true,
+      message: 'Successfully seeded study matches (Alice, Bob, Clara) and updated your profile in the production database!'
+    });
+  } catch (error) {
+    console.error('Production seeding error:', error);
+    res.status(500).json({ message: 'Server error during database seeding', error: error.message });
+  }
+};
+
 module.exports = {
   registerUser,
   loginUser,
   getMe,
   updateProfile,
   uploadAvatar,
-  getMatches
+  getMatches,
+  seedMatchesProduction
 };

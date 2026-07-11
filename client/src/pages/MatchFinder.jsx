@@ -31,6 +31,22 @@ const MatchFinder = () => {
     setTimeout(() => setAlert(null), 5000);
   };
 
+  const handleSeedData = async () => {
+    setLoading(true);
+    try {
+      const response = await axios.get('/api/auth/seed-matches');
+      triggerAlert('success', response.data.message);
+      // Fetch matches again
+      const matchesRes = await axios.get('/api/auth/matches');
+      setMatches(matchesRes.data);
+    } catch (err) {
+      console.error(err);
+      triggerAlert('error', 'Failed to seed mock classmates and align profile.');
+    } finally {
+      setLoading(false);
+    }
+  };
+
   return (
     <div className="main-content animate-fade-in" style={{ padding: '32px' }}>
       {alert && (
@@ -53,9 +69,17 @@ const MatchFinder = () => {
           <div className="skeleton-card" />
         </div>
       ) : matches.length === 0 ? (
-        <div className="empty-state">
+        <div className="empty-state" style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: '16px' }}>
           <Info size={32} />
-          <p>No matches found yet. Try listing more courses and availability slots in your profile configuration!</p>
+          <p style={{ maxWidth: '400px' }}>No matches found yet. Try listing more courses and availability slots in your profile configuration!</p>
+          <button 
+            className="btn btn-secondary" 
+            onClick={handleSeedData} 
+            style={{ marginTop: '12px', display: 'inline-flex', alignItems: 'center', gap: '8px' }}
+          >
+            <RefreshCw size={14} />
+            <span>Seed Mock Classmates & Align My Profile</span>
+          </button>
         </div>
       ) : (
         <div className="dashboard-grid">
