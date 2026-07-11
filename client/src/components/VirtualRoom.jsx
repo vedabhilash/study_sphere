@@ -35,16 +35,10 @@ function getIceServers() {
 
   console.warn(
     '[WebRTC] No VITE_TURN_URL/VITE_TURN_USERNAME/VITE_TURN_CREDENTIAL configured. ' +
-    'Falling back to STUN only + the free openrelay.metered.ca demo TURN server, ' +
-    'which is unreliable for production use. Calls between users on different ' +
-    'networks may fail. See client/.env.example.'
+    'Falling back to STUN servers only. Local/same-network calls will work, ' +
+    'but cross-network calls may fail. See client/.env.example.'
   );
-  return [
-    ...stunServers,
-    { urls: 'turn:openrelay.metered.ca:80', username: 'openrelayproject', credential: 'openrelayproject' },
-    { urls: 'turn:openrelay.metered.ca:443', username: 'openrelayproject', credential: 'openrelayproject' },
-    { urls: 'turn:openrelay.metered.ca:443?transport=tcp', username: 'openrelayproject', credential: 'openrelayproject' }
-  ];
+  return stunServers;
 }
 
 // Callback ref helper — re-runs on every mount so newly-remounted <video>
@@ -1036,17 +1030,30 @@ export default function VirtualRoom({ group, currentStudent, allStudents, socket
   // when remote peers receive the meetingUserJoined broadcast and start signaling.
   useEffect(() => {
     if (!socket || !joined) return;
-    socket.emit('joinMeeting', {
-      groupId: group.id,
-      student: {
-        id: currentStudent.id,
-        name: currentStudent.name,
-        avatar: currentStudent.avatar,
-        micOn: micOnRef.current,
-        videoOn: localStreamRef.current ? localStreamRef.current.getVideoTracks().length > 0 : false
-      }
-    });
-    console.log('[Meeting] joinMeeting emitted after listeners registered');
+
+    const emitJoin = () => {
+      socket.emit('joinMeeting', {
+        groupId: group.id,
+        student: {
+          id: currentStudent.id,
+          name: currentStudent.name,
+          avatar: currentStudent.avatar,
+          micOn: micOnRef.current,
+          videoOn: localStreamRef.current ? localStreamRef.current.getVideoTracks().length > 0 : false
+        }
+      });
+      console.log('[Meeting] joinMeeting emitted');
+    };
+
+    // Emit initially
+    emitJoin();
+
+    // Listen for reconnection to re-join room
+    socket.on('connect', emitJoin);
+
+    return () => {
+      socket.off('connect', emitJoin);
+    };
   }, [socket, joined]); // eslint-disable-line react-hooks/exhaustive-deps
 
   // Display Reaction Floating Card

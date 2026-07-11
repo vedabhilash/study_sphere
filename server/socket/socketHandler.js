@@ -76,6 +76,11 @@ const socketHandler = (io) => {
 
     // User joins meeting room
     socket.on('joinMeeting', ({ groupId, student }) => {
+      if (student && student.id) {
+        socket.join(student.id);
+        onlineUsers.set(student.id, socket.id);
+        socket.userId = student.id;
+      }
       socket.join(`${groupId}-meeting`);
       socket.to(`${groupId}-meeting`).emit('meetingUserJoined', student);
       console.log(`Meeting: ${student.name} joined room ${groupId}-meeting`);
