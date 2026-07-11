@@ -20,7 +20,7 @@ export const SocketProvider = ({ children }) => {
     }
 
     // Connect to backend socket server
-    const backendUrl = import.meta.env.VITE_API_URL || window.location.origin;
+    const backendUrl = import.meta.env.VITE_API_URL || 'http://localhost:5000';
     const newSocket = io(backendUrl, {
       autoConnect: true,
       reconnection: true
