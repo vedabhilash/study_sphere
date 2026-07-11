@@ -270,3 +270,10 @@
     transform: scale(1);
   }
 }
+
+/* Hide on desktop viewports */
+@media (min-width: 1024px) {
+  .top-header-wrapper {
+    display: none;
+  }
+}

@@ -17,7 +17,7 @@
   display: grid;
   grid-template-columns: 1fr;
   gap: 16px;
-  background: rgba(24, 32, 53, 0.2);
+  background: var(--bg-card);
   border: 1px solid var(--border-color);
   padding: 16px;
   border-radius: var(--radius-md);
@@ -54,7 +54,7 @@
 }
 
 .group-explore-card {
-  background: rgba(24, 32, 53, 0.4);
+  background: var(--bg-card);
   backdrop-filter: blur(8px);
   -webkit-backdrop-filter: blur(8px);
   border: 1px solid var(--border-color);

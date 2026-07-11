@@ -173,7 +173,7 @@
 .chat-input-area {
   padding: 16px;
   border-top: 1px solid var(--border-color);
-  background: rgba(18, 24, 41, 0.6);
+  background: var(--bg-secondary);
   display: flex;
   gap: 12px;
   align-items: center;
@@ -193,7 +193,7 @@
 }
 
 .resource-card {
-  background: rgba(24, 32, 53, 0.4);
+  background: var(--bg-card);
   border: 1px solid var(--border-color);
   border-radius: var(--radius-md);
   padding: 20px;
@@ -205,7 +205,7 @@
 
 .resource-card:hover {
   border-color: var(--primary);
-  background: rgba(24, 32, 53, 0.6);
+  background: var(--bg-card-hover);
 }
 
 .resource-title {
@@ -244,7 +244,7 @@
 }
 
 .session-card {
-  background: rgba(24, 32, 53, 0.4);
+  background: var(--bg-card);
   border: 1px solid var(--border-color);
   border-radius: var(--radius-md);
   padding: 20px;
