@@ -1549,10 +1549,12 @@ export default function VirtualRoom({ group, currentStudent, allStudents, socket
                 const isSpeaking = activeSpeaker === peerId;
                 const isPresenter = peer.sharingScreen;
 
+                const hasVideoTrack = stream && stream.getVideoTracks().length > 0;
+
                 // Show video when we have a stream and the peer has not explicitly turned video off.
                 // Treating peer.videoOn === undefined as "not yet synced -> assume on" prevents
                 // blank tiles during the initial connection handshake.
-                const showVideo = hasStream && peer.videoOn !== false;
+                const showVideo = hasVideoTrack && peer.videoOn !== false;
 
                 return (
                   <div key={peerId} className={`video-card ${isSpeaking ? 'active-speaker' : ''} ${isPresenter ? 'screen-share-card' : ''}`}>
