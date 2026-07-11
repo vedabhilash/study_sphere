@@ -6,6 +6,7 @@ import {
   AlertCircle, HelpCircle, Check
 } from 'lucide-react';
 import axios from 'axios';
+import Avatar from './Avatar';
 
 // STUN servers are free/public - they help peers discover their public address.
 // TURN servers relay media and are required when direct P2P fails (symmetric NAT,
@@ -1550,7 +1551,7 @@ export default function VirtualRoom({ group, currentStudent, allStudents, socket
                     <video ref={el => bindStream(el, localStream)} autoPlay playsInline muted />
                   ) : (
                     <div className="video-placeholder">
-                      <div className="placeholder-avatar initials">{currentStudent.name.charAt(0).toUpperCase()}</div>
+                      <Avatar src={currentStudent.avatar} name={currentStudent.name} size="64px" className="placeholder-avatar" />
                       <span className="placeholder-name">Camera Off</span>
                     </div>
                   )}
@@ -1605,11 +1606,7 @@ export default function VirtualRoom({ group, currentStudent, allStudents, socket
                           />
                         )}
                         <div className="video-placeholder">
-                          {peer.avatar && peer.avatar !== 'https://via.placeholder.com/150' ? (
-                            <img src={peer.avatar} alt={peer.name} className="placeholder-avatar" />
-                          ) : (
-                            <div className="placeholder-avatar initials">{peer.name.charAt(0).toUpperCase()}</div>
-                          )}
+                          <Avatar src={peer.avatar} name={peer.name} size="64px" className="placeholder-avatar" />
                           <span className="placeholder-name">Camera Off</span>
                         </div>
                       </>
@@ -1838,7 +1835,7 @@ export default function VirtualRoom({ group, currentStudent, allStudents, socket
                   {/* Render Local User */}
                   <div className="participant-item">
                     <div className="item-left">
-                      <div className="participant-avatar initials">{currentStudent.name.charAt(0).toUpperCase()}</div>
+                      <Avatar src={currentStudent.avatar} name={currentStudent.name} size="32px" className="participant-avatar" />
                       <div className="item-text">
                         <span className="participant-name">{currentStudent.name} (You)</span>
                         {isAdmin && <span className="host-tag"><Crown size={10} /> Host</span>}
@@ -1860,11 +1857,7 @@ export default function VirtualRoom({ group, currentStudent, allStudents, socket
                     return (
                       <div key={peerId} className="participant-item">
                         <div className="item-left">
-                          {peer.avatar && peer.avatar !== 'https://via.placeholder.com/150' ? (
-                            <img src={peer.avatar} alt={peer.name} className="participant-avatar" />
-                          ) : (
-                            <div className="participant-avatar initials">{peer.name.charAt(0).toUpperCase()}</div>
-                          )}
+                          <Avatar src={peer.avatar} name={peer.name} size="32px" className="participant-avatar" />
                           <div className="item-text">
                             <span className="participant-name">{peer.name}</span>
                             {peerIsAdmin && <span className="host-tag"><Crown size={10} /> Host</span>}

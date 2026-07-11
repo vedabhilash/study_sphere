@@ -3,6 +3,7 @@ import axios from 'axios';
 import { useAuth } from '../../context/AuthContext';
 import { Link } from 'react-router-dom';
 import { Upload, CheckCircle, AlertCircle, Loader } from 'lucide-react';
+import Avatar from '../../components/Avatar';
 import './Profile.css';
 
 const getFullUrl = (url) => {
@@ -128,11 +129,7 @@ const PersonalDetails = () => {
         {/* Avatar Section */}
         <div className="avatar-section">
           <div className="avatar-preview-container">
-            {user?.avatar ? (
-              <img src={getFullUrl(user.avatar)} alt={name} className="avatar-img" />
-            ) : (
-              <div className="avatar-placeholder">{getInitials()}</div>
-            )}
+            <Avatar src={user?.avatar} name={name || user?.name || 'User'} size="100%" style={{ border: 'none', boxShadow: 'none' }} />
           </div>
 
           <div className="avatar-upload-wrapper">

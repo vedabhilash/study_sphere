@@ -1,6 +1,7 @@
 import React, { useState } from 'react';
 import { NavLink, Link, useNavigate } from 'react-router-dom';
 import { useAuth } from '../context/AuthContext';
+import Avatar from './Avatar';
 import { 
   GraduationCap, 
   LayoutDashboard, 
@@ -34,20 +35,6 @@ const Sidebar = ({ isOpen, onClose }) => {
   };
 
   if (!user) return null;
-
-  // Get user avatar or first letter for initial avatar fallback
-  const getAvatarSource = () => {
-    if (user.avatar) {
-      const avatar = user.avatar;
-      if (avatar.startsWith('http://') || avatar.startsWith('https://')) return avatar;
-      return `${import.meta.env.VITE_API_URL || ''}${avatar}`;
-    }
-    return null;
-  };
-
-  const getInitials = () => {
-    return user.name ? user.name.charAt(0).toUpperCase() : 'U';
-  };
 
   return (
     <>
@@ -163,23 +150,15 @@ const Sidebar = ({ isOpen, onClose }) => {
               <Settings size={18} />
               <span>Settings</span>
             </NavLink>
+            {/* Profile Navigation Group */}
+            <div style={{ display: 'none' }}></div>
           </div>
         </nav>
 
         {/* Sidebar Footer - User Profile */}
         <div className="sidebar-footer">
           <div className="user-profile-summary">
-            {getAvatarSource() ? (
-              <img 
-                src={getAvatarSource()} 
-                alt={user.name} 
-                className="user-profile-avatar"
-              />
-            ) : (
-              <div className="user-profile-avatar-placeholder">
-                {getInitials()}
-              </div>
-            )}
+            <Avatar src={user.avatar} name={user.name} size="40px" />
             <div className="user-profile-details">
               <span className="user-profile-name" title={user.name}>{user.name}</span>
               <span className="user-profile-email" title={user.email}>{user.email}</span>

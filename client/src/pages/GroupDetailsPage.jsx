@@ -28,6 +28,7 @@ import {
 } from 'lucide-react';
 import './GroupDetailsPage.css';
 import VirtualRoom from '../components/VirtualRoom';
+import Avatar from '../components/Avatar';
 
 const getFullUrl = (url) => {
   if (!url) return '';
@@ -403,11 +404,7 @@ const GroupDetailsPage = () => {
               <div style={{ display: 'flex', flexDirection: 'column', gap: '12px' }}>
                 {group.members?.map((member) => (
                   <div key={member._id} style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
-                    <img 
-                      src={member.avatar || 'https://via.placeholder.com/150'} 
-                      alt={member.name} 
-                      style={{ width: '32px', height: '32px', borderRadius: '50%', border: '1px solid var(--border-color)' }}
-                    />
+                    <Avatar src={member.avatar} name={member.name} size="32px" />
                     <div>
                       <p style={{ fontSize: '0.9rem', fontWeight: 600, color: 'var(--text-primary)' }}>
                         {member.name}
@@ -476,10 +473,11 @@ const GroupDetailsPage = () => {
                     messages.map((msg) => {
                       const isMe = msg.sender?._id === user._id || msg.sender === user._id;
                       const senderName = isMe ? 'You' : (msg.sender?.name || 'User');
-                      const senderAvatar = getFullUrl(isMe ? user.avatar : (msg.sender?.avatar || 'https://via.placeholder.com/150'));
+                      const displayName = isMe ? user.name : (msg.sender?.name || 'User');
+                      const senderAvatar = isMe ? user.avatar : msg.sender?.avatar;
                       return (
                         <div key={msg._id} className={`chat-bubble-container ${isMe ? 'me' : ''}`}>
-                          <img src={senderAvatar} alt={senderName} className="chat-bubble-avatar" />
+                          <Avatar src={senderAvatar} name={displayName} size="36px" className="chat-bubble-avatar" />
                           <div className="chat-bubble-content">
                             <span className={`chat-bubble-header ${isMe ? 'me' : ''}`}>
                               {senderName} • {new Date(msg.timestamp).toLocaleTimeString(undefined, { hour: '2-digit', minute: '2-digit' })}

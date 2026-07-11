@@ -2,6 +2,7 @@ import React from 'react';
 import { NavLink, Link, useNavigate } from 'react-router-dom';
 import { useAuth } from '../context/AuthContext';
 import { GraduationCap, LayoutDashboard, Users, LogOut, LogIn, UserPlus } from 'lucide-react';
+import Avatar from './Avatar';
 import './Navbar.css';
 
 const Navbar = () => {
@@ -42,11 +43,7 @@ const Navbar = () => {
 
             <div className="nav-user">
               <div className="nav-profile">
-                <img 
-                  src={user.avatar || 'https://via.placeholder.com/150'} 
-                  alt={user.name} 
-                  className="nav-avatar"
-                />
+                <Avatar src={user.avatar} name={user.name} size="36px" />
                 <span className="nav-username">{user.name}</span>
               </div>
               <button onClick={handleLogout} className="btn-logout">
