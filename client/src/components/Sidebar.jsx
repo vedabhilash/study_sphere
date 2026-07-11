@@ -24,7 +24,7 @@ import './Sidebar.css';
 const Sidebar = ({ isOpen, onClose }) => {
   const { user, logout } = useAuth();
   const navigate = useNavigate();
-  const [profileExpanded, setProfileExpanded] = useState(true);
+  const [profileExpanded, setProfileExpanded] = useState(false);
 
   const handleLogout = () => {
     logout();
