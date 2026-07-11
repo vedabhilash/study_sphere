@@ -23,13 +23,20 @@ if (process.env.CLIENT_URL) {
 }
 
 const isLocalOrigin = (origin) => {
-  if (!origin) return true;
-  return /^https?:\/\/(localhost|127\.0\.0\.1)(:\d+)?$/.test(origin);
+  if (!origin || origin === 'null') return true;
+  // Match localhost, 127.0.0.1, and private IPv4 address spaces (192.168.x.x, 10.x.x.x, 172.16.x.x-172.31.x.x)
+  return /^https?:\/\/((localhost|127\.0\.0\.1)|(10\.\d+|192\.168\.\d+|172\.(1[6-9]|2\d|3[01])\.\d+)\.\d+)(:\d+)?$/.test(origin);
 };
 
 const corsOptions = {
   origin: (origin, callback) => {
-    if (!origin || isLocalOrigin(origin) || allowedOrigins.includes(origin)) {
+    if (
+      process.env.NODE_ENV !== 'production' ||
+      !origin ||
+      origin === 'null' ||
+      isLocalOrigin(origin) ||
+      allowedOrigins.includes(origin)
+    ) {
       callback(null, true);
     } else {
       callback(new Error('Not allowed by CORS'));
