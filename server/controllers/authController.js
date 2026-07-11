@@ -1,5 +1,6 @@
 const jwt = require('jsonwebtoken');
 const User = require('../models/User');
+const { getSortedMatches } = require('../utils/matchingAlgorithm');
 
 // Generate JWT
 const generateToken = (id) => {
@@ -182,10 +183,32 @@ const uploadAvatar = async (req, res) => {
   }
 };
 
+// @desc    Get study matches for the current user
+const getMatches = async (req, res) => {
+  try {
+    const currentUser = await User.findById(req.user.id);
+    if (!currentUser) {
+      return res.status(404).json({ message: 'User not found' });
+    }
+
+    // Fetch all other users
+    const allUsers = await User.find({ _id: { $ne: req.user.id } });
+    
+    // Sort matches
+    const sortedMatches = getSortedMatches(currentUser, allUsers);
+    
+    res.status(200).json(sortedMatches);
+  } catch (error) {
+    console.error('Get matches error:', error);
+    res.status(500).json({ message: 'Server error calculating matches' });
+  }
+};
+
 module.exports = {
   registerUser,
   loginUser,
   getMe,
   updateProfile,
   uploadAvatar,
+  getMatches
 };

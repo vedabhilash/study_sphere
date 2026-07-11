@@ -4,7 +4,7 @@
  * @param {Object} studentB - The prospective match student profile.
  * @returns {Object} { score: number, reasons: string[] }
  */
-export function calculateMatchScore(studentA, studentB) {
+function calculateMatchScore(studentA, studentB) {
   if (!studentA || !studentB || studentA._id.toString() === studentB._id.toString()) {
     return { score: 0, reasons: [] };
   }
@@ -27,11 +27,13 @@ export function calculateMatchScore(studentA, studentB) {
 
   // 2. Availability Overlap (Weight: 30%)
   let overlapSlots = 0;
-  const days = Object.keys(studentA.availability || {});
+  const availabilityA = studentA.weeklyAvailability || studentA.availability || {};
+  const availabilityB = studentB.weeklyAvailability || studentB.availability || {};
+  const days = Object.keys(availabilityA);
   
   days.forEach(day => {
-    const slotsA = studentA.availability[day] || [];
-    const slotsB = (studentB.availability && studentB.availability[day]) || [];
+    const slotsA = availabilityA[day] || [];
+    const slotsB = availabilityB[day] || [];
     const intersection = slotsA.filter(slot => slotsB.includes(slot));
     overlapSlots += intersection.length;
   });
@@ -43,11 +45,11 @@ export function calculateMatchScore(studentA, studentB) {
   }
 
   // 3. Study Style Matching (Weight: 20%)
-  const styleA = studentA.studyStyle;
-  const styleB = studentB.studyStyle;
+  const styleA = studentA.preferredStudyStyle || studentA.studyStyle;
+  const styleB = studentB.preferredStudyStyle || studentB.studyStyle;
   
   if (styleA && styleB) {
-    if (styleA === styleB) {
+    if (styleA.toLowerCase().trim() === styleB.toLowerCase().trim()) {
       totalScore += 20;
       const displayStyle = styleA.charAt(0).toUpperCase() + styleA.slice(1);
       reasons.push(`Perfect study style match: both prefer ${displayStyle}`);
@@ -89,7 +91,7 @@ export function calculateMatchScore(studentA, studentB) {
  * @param {Array} studentList - List of all student profiles.
  * @returns {Array} List of students with match score and reasons appended, sorted descending.
  */
-export function getSortedMatches(targetStudent, studentList) {
+function getSortedMatches(targetStudent, studentList) {
   if (!targetStudent) return [];
   
   return studentList
@@ -105,5 +107,11 @@ export function getSortedMatches(targetStudent, studentList) {
         matchReasons: matchResult.reasons
       };
     })
+    .filter(item => item.matchScore > 0) // Only return matches with overlap
     .sort((a, b) => b.matchScore - a.matchScore);
 }
+
+module.exports = {
+  calculateMatchScore,
+  getSortedMatches
+};
