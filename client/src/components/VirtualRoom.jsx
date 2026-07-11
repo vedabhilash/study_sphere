@@ -81,6 +81,7 @@ export default function VirtualRoom({ group, currentStudent, allStudents, socket
   const peerConnections = useRef({});
   const remoteStreams = useRef({});
   const [remoteVideoStreams, setRemoteVideoStreams] = useState({});
+  const [iceServers, setIceServers] = useState([]);
 
   // Active Participants List (syncs with Socket.io)
   const [participants, setParticipants] = useState({});
@@ -134,6 +135,25 @@ export default function VirtualRoom({ group, currentStudent, allStudents, socket
     }, 1000);
     return () => clearInterval(timer);
   }, [joined]);
+
+  // Fetch TURN credentials from Metered API dynamically
+  useEffect(() => {
+    async function fetchIceServers() {
+      try {
+        const response = await fetch(
+          "https://studentstudysphereonline.metered.live/api/v1/turn/credentials?apiKey=c0b50defc681b20bfde41bd070f385d062e9"
+        );
+        const servers = await response.json();
+        if (Array.isArray(servers) && servers.length > 0) {
+          console.log("[WebRTC] Successfully fetched TURN credentials dynamically from Metered");
+          setIceServers(servers);
+        }
+      } catch (err) {
+        console.error("Failed to fetch TURN credentials, falling back to STUN only:", err);
+      }
+    }
+    fetchIceServers();
+  }, []);
 
   // Format Duration
   const formatTime = (secs) => {
@@ -628,7 +648,13 @@ export default function VirtualRoom({ group, currentStudent, allStudents, socket
       }
 
       console.log(`[WebRTC] Creating peer connection for: ${memberId}`);
-      const pc = new RTCPeerConnection({ iceServers: getIceServers() });
+      const stunServers = [
+        { urls: 'stun:stun.l.google.com:19302' },
+        { urls: 'stun:stun1.l.google.com:19302' },
+        { urls: 'stun:stun2.l.google.com:19302' }
+      ];
+      const serversConfig = iceServers.length > 0 ? iceServers : stunServers;
+      const pc = new RTCPeerConnection({ iceServers: serversConfig });
 
       pc.iceCandidatesQueue = [];
       pc.makingOffer = false;
