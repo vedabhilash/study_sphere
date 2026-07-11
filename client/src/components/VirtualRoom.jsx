@@ -53,6 +53,11 @@ function getIceServers() {
 const bindStream = (el, stream) => {
   if (el && el.srcObject !== (stream || null)) {
     el.srcObject = stream || null;
+    if (stream) {
+      // Explicitly trigger play to ensure the browser decodes and plays
+      // the media immediately, avoiding silent pause/black-frame bugs on mount.
+      el.play().catch(err => console.log('[WebRTC] autoplay prevented or failed:', err));
+    }
   }
 };
 
@@ -683,28 +688,17 @@ export default function VirtualRoom({ group, currentStudent, allStudents, socket
       pc.ontrack = (event) => {
         console.log(`[WebRTC] Remote track received from ${memberId}, track kind: ${event.track.kind}`);
         
-        if (!remoteStreams.current[memberId]) {
-          remoteStreams.current[memberId] = new MediaStream();
-        }
+        // Use the native remote stream object (event.streams[0]) instead of a custom
+        // constructed MediaStream. This ensures the browser's hardware decoders are
+        // natively and correctly linked to the incoming track pipeline.
+        const stream = event.streams[0] || new MediaStream([event.track]);
+        remoteStreams.current[memberId] = stream;
         
-        const existingStream = remoteStreams.current[memberId];
-        
-        // Remove existing tracks of the same kind to prevent duplicates
-        existingStream.getTracks().forEach(track => {
-          if (track.kind === event.track.kind) {
-            existingStream.removeTrack(track);
-          }
-        });
-        existingStream.addTrack(event.track);
-        
-        // Create a NEW MediaStream object so React detects the state change
-        // and triggers a re-render (same reference = no-op in setState).
-        const freshStream = new MediaStream(existingStream.getTracks());
-        remoteStreams.current[memberId] = freshStream;
-        
+        // Returning a new object reference triggers React to detect state changes
+        // and safely re-render the components.
         setRemoteVideoStreams(prev => ({
           ...prev,
-          [memberId]: freshStream
+          [memberId]: stream
         }));
       };
 
