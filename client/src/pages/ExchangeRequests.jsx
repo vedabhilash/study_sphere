@@ -18,6 +18,16 @@ const ExchangeRequests = () => {
   const [loading, setLoading] = useState(true);
   const [alert, setAlert] = useState(null);
 
+  // Booking Modal States
+  const [bookingModalOpen, setBookingModalOpen] = useState(false);
+  const [selectedPartner, setSelectedPartner] = useState(null);
+  const [selectedSkill, setSelectedSkill] = useState('');
+  const [bookingDate, setBookingDate] = useState('');
+  const [bookingTime, setBookingTime] = useState('');
+  const [bookingDuration, setBookingDuration] = useState('60');
+  const [bookingType, setBookingType] = useState('Video');
+  const [bookingNotes, setBookingNotes] = useState('');
+
   useEffect(() => {
     if (user) {
       fetchHistory();
@@ -109,6 +119,44 @@ const ExchangeRequests = () => {
       fetchHistory();
     } catch (err) {
       triggerAlert('error', err.message || 'Failed to decline request.');
+    }
+  };
+
+  const handleOpenBooking = (partner, skill) => {
+    setSelectedPartner(partner);
+    setSelectedSkill(skill);
+    setBookingModalOpen(true);
+  };
+
+  const handleBookSession = async () => {
+    if (!bookingDate || !bookingTime || !selectedPartner || !selectedSkill) {
+      triggerAlert('error', 'Please fill out all booking fields.');
+      return;
+    }
+
+    try {
+      const dateTime = new Date(`${bookingDate}T${bookingTime}`);
+      
+      // Validation: verify date is in the future
+      if (dateTime <= new Date()) {
+        triggerAlert('error', 'Session date and time must be in the future.');
+        return;
+      }
+
+      await skillsAPI.bookSession({
+        partnerId: selectedPartner._id,
+        skill: selectedSkill,
+        date: dateTime.toISOString(),
+        duration: parseInt(bookingDuration),
+        meetingType: bookingType,
+        notes: bookingNotes
+      });
+      triggerAlert('success', 'Study session booked successfully!');
+      setBookingModalOpen(false);
+      setBookingNotes('');
+      fetchHistory();
+    } catch (err) {
+      triggerAlert('error', err.message || 'Booking failed.');
     }
   };
 
@@ -295,6 +343,19 @@ const ExchangeRequests = () => {
                     </button>
                   </div>
                 )}
+
+                {req.status === 'Accepted' && (
+                  <div style={{ display: 'flex', justifyContent: 'flex-end', marginTop: '16px' }}>
+                    <button 
+                      className="btn btn-primary" 
+                      style={{ padding: '6px 12px', fontSize: '0.85rem', display: 'flex', alignItems: 'center', gap: '6px' }} 
+                      onClick={() => handleOpenBooking(partner, req.skill)}
+                    >
+                      <Calendar size={14} />
+                      <span>Book Skill Session</span>
+                    </button>
+                  </div>
+                )}
               </div>
             );
           })}
@@ -306,6 +367,83 @@ const ExchangeRequests = () => {
             </div>
           )}
 
+        </div>
+      )}
+
+      {/* Book Session modal */}
+      {bookingModalOpen && selectedPartner && (
+        <div className="modal-overlay" onClick={() => setBookingModalOpen(false)}>
+          <div className="modal-content" onClick={e => e.stopPropagation()}>
+            <div className="modal-header">
+              <h3>Book Study Session</h3>
+              <button className="modal-close" onClick={() => setBookingModalOpen(false)}>&times;</button>
+            </div>
+            
+            <div style={{ marginBottom: '16px', fontSize: '0.9rem', color: 'var(--text-secondary)' }}>
+              Booking <strong>{selectedSkill}</strong> tutoring with <strong>{selectedPartner.name}</strong>.
+            </div>
+
+            <div className="form-group">
+              <label className="form-label">Date</label>
+              <input 
+                type="date" 
+                className="form-input" 
+                value={bookingDate} 
+                required
+                onChange={e => setBookingDate(e.target.value)} 
+              />
+            </div>
+            <div className="form-group">
+              <label className="form-label">Time</label>
+              <input 
+                type="time" 
+                className="form-input" 
+                value={bookingTime} 
+                required
+                onChange={e => setBookingTime(e.target.value)} 
+              />
+            </div>
+            <div className="form-group">
+              <label className="form-label">Duration (minutes)</label>
+              <select 
+                className="form-input" 
+                value={bookingDuration} 
+                onChange={e => setBookingDuration(e.target.value)}
+              >
+                <option value="30">30 minutes</option>
+                <option value="45">45 minutes</option>
+                <option value="60">60 minutes</option>
+                <option value="90">90 minutes</option>
+                <option value="120">120 minutes</option>
+              </select>
+            </div>
+            <div className="form-group">
+              <label className="form-label">Meeting Type</label>
+              <select 
+                className="form-input" 
+                value={bookingType} 
+                onChange={e => setBookingType(e.target.value)}
+              >
+                <option value="Video">Video Call (Studysphere Virtual Room)</option>
+                <option value="In Person">In Person Meetup</option>
+              </select>
+            </div>
+            <div className="form-group">
+              <label className="form-label">Notes / Learning Goals</label>
+              <textarea 
+                className="form-input" 
+                placeholder="What topics do you want to cover? e.g., prepare for midterm, practice recursion..."
+                style={{ minHeight: '80px' }}
+                value={bookingNotes}
+                onChange={e => setBookingNotes(e.target.value)}
+              />
+            </div>
+
+            <div className="modal-footer" style={{ display: 'flex', gap: '12px', justifyContent: 'flex-end', marginTop: '24px' }}>
+              <button className="btn btn-secondary" onClick={() => setBookingModalOpen(false)}>Cancel</button>
+              <button className="btn btn-primary" onClick={handleBookSession}>Schedule Session</button>
+            </div>
+          </div>
         </div>
       )}
     </div>
