@@ -1,5 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { useAuth } from '../context/AuthContext';
+import { useSocket } from '../context/SocketContext';
 import Avatar from '../components/Avatar';
 import { 
   Users, Check, X, Clock, Calendar, HelpCircle, BookOpen, AlertCircle, Video, FileText, CheckCircle 
@@ -9,6 +10,7 @@ import './SkillMarketplace.css';
 
 const ExchangeRequests = () => {
   const { user } = useAuth();
+  const socket = useSocket();
   const [activeSegment, setActiveSegment] = useState('pending'); // 'pending' | 'accepted' | 'completed' | 'rejected'
   
   const [requests, setRequests] = useState([]);
@@ -21,6 +23,56 @@ const ExchangeRequests = () => {
       fetchHistory();
     }
   }, [user]);
+
+  // Handle real-time socket updates without page refreshes
+  useEffect(() => {
+    if (!socket) return;
+
+    const handleReceived = (newRequest) => {
+      setRequests((prev) => {
+        const exists = prev.some((r) => r._id === newRequest._id);
+        if (exists) {
+          return prev.map((r) => r._id === newRequest._id ? newRequest : r);
+        }
+        return [newRequest, ...prev];
+      });
+    };
+
+    const handleAccepted = (updatedRequest) => {
+      setRequests((prev) =>
+        prev.map((r) => (r._id === updatedRequest._id ? { ...r, status: 'Accepted' } : r))
+      );
+      fetchHistory();
+    };
+
+    const handleSessionBooked = (newSession) => {
+      setSessions((prev) => {
+        const exists = prev.some((s) => s._id === newSession._id);
+        if (exists) return prev;
+        return [newSession, ...prev];
+      });
+      fetchHistory();
+    };
+
+    const handleSessionCancelled = (cancelledSession) => {
+      setSessions((prev) =>
+        prev.map((s) => (s._id === cancelledSession._id ? { ...s, status: 'Cancelled' } : s))
+      );
+      fetchHistory();
+    };
+
+    socket.on('exchangeRequestReceived', handleReceived);
+    socket.on('exchangeRequestAccepted', handleAccepted);
+    socket.on('sessionBooked', handleSessionBooked);
+    socket.on('sessionCancelled', handleSessionCancelled);
+
+    return () => {
+      socket.off('exchangeRequestReceived', handleReceived);
+      socket.off('exchangeRequestAccepted', handleAccepted);
+      socket.off('sessionBooked', handleSessionBooked);
+      socket.off('sessionCancelled', handleSessionCancelled);
+    };
+  }, [socket]);
 
   const fetchHistory = async () => {
     setLoading(true);
