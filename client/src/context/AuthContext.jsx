@@ -1,4 +1,5 @@
 import React, { createContext, useState, useEffect, useContext } from 'react';
+import axios from 'axios';
 import { authAPI } from '../utils/apiService';
 
 const AuthContext = createContext(null);
@@ -10,11 +11,13 @@ export const AuthProvider = ({ children }) => {
   const [token, setToken] = useState(localStorage.getItem('token') || '');
   const [loading, setLoading] = useState(true);
 
-  // Set token in localStorage on token change
+  // Set default authorization header for Axios and update localStorage
   useEffect(() => {
     if (token) {
+      axios.defaults.headers.common['Authorization'] = `Bearer ${token}`;
       localStorage.setItem('token', token);
     } else {
+      delete axios.defaults.headers.common['Authorization'];
       localStorage.removeItem('token');
     }
   }, [token]);
