@@ -1,10 +1,10 @@
 import React, { useState, useEffect } from 'react';
-import axios from 'axios';
 import { useAuth } from '../context/AuthContext';
 import Avatar from '../components/Avatar';
 import { 
-  Users, Check, X, Clock, Calendar, HelpCircle, BookOpen, AlertCircle, Video, FileText 
+  Users, Check, X, Clock, Calendar, HelpCircle, BookOpen, AlertCircle, Video, FileText, CheckCircle 
 } from 'lucide-react';
+import { skillsAPI } from '../utils/apiService';
 import './SkillMarketplace.css';
 
 const ExchangeRequests = () => {
@@ -17,17 +17,19 @@ const ExchangeRequests = () => {
   const [alert, setAlert] = useState(null);
 
   useEffect(() => {
-    fetchHistory();
-  }, []);
+    if (user) {
+      fetchHistory();
+    }
+  }, [user]);
 
   const fetchHistory = async () => {
     setLoading(true);
     try {
-      const response = await axios.get('/api/exchange/history');
-      setRequests(response.data.requests);
-      setSessions(response.data.sessions);
+      const data = await skillsAPI.getHistory();
+      setRequests(data.requests || []);
+      setSessions(data.sessions || []);
     } catch (err) {
-      triggerAlert('error', 'Failed to fetch request history.');
+      triggerAlert('error', err.message || 'Failed to fetch request history.');
     } finally {
       setLoading(false);
     }
@@ -40,21 +42,21 @@ const ExchangeRequests = () => {
 
   const handleAccept = async (reqId) => {
     try {
-      await axios.put(`/api/exchange/request/${reqId}/accept`);
+      await skillsAPI.acceptRequest(reqId);
       triggerAlert('success', 'Exchange request accepted!');
       fetchHistory();
     } catch (err) {
-      triggerAlert('error', 'Failed to accept request.');
+      triggerAlert('error', err.message || 'Failed to accept request.');
     }
   };
 
   const handleReject = async (reqId) => {
     try {
-      await axios.put(`/api/exchange/request/${reqId}/reject`);
+      await skillsAPI.rejectRequest(reqId);
       triggerAlert('success', 'Exchange request declined.');
       fetchHistory();
     } catch (err) {
-      triggerAlert('error', 'Failed to decline request.');
+      triggerAlert('error', err.message || 'Failed to decline request.');
     }
   };
 
@@ -82,6 +84,14 @@ const ExchangeRequests = () => {
     }
     return [];
   };
+
+  if (!user) {
+    return (
+      <div style={{ display: 'flex', justifyContent: 'center', padding: '64px', minHeight: '80vh', alignItems: 'center' }}>
+        <Clock size={48} style={{ animation: 'spin 1s linear infinite', color: 'var(--primary)' }} />
+      </div>
+    );
+  }
 
   return (
     <div className="main-content">
@@ -118,7 +128,7 @@ const ExchangeRequests = () => {
           onClick={() => setActiveSegment('completed')}
         >
           <CheckCircle size={16} />
-          <span>Completed sessions</span>
+          <span>Completed Sessions</span>
         </button>
         <button 
           className={`group-tab-btn ${activeSegment === 'rejected' ? 'active' : ''}`}
@@ -131,8 +141,8 @@ const ExchangeRequests = () => {
 
       {loading ? (
         <div className="skeleton-loading-container" style={{ marginTop: '24px' }}>
-          <div className="skeleton-card" />
-          <div className="skeleton-card" />
+          <div className="skeleton-card" style={{ height: '120px', background: 'rgba(255,255,255,0.03)', borderRadius: '8px', marginBottom: '16px', animation: 'pulse 1.5s infinite' }} />
+          <div className="skeleton-card" style={{ height: '120px', background: 'rgba(255,255,255,0.03)', borderRadius: '8px', animation: 'pulse 1.5s infinite' }} />
         </div>
       ) : (
         <div className="requests-container" style={{ marginTop: '24px', display: 'flex', flexDirection: 'column', gap: '16px' }}>
@@ -141,16 +151,19 @@ const ExchangeRequests = () => {
           {getFilteredSessions().map(session => {
             const isMentor = session.mentor?._id === user._id;
             const partner = isMentor ? session.learner : session.mentor;
+            const partnerName = partner?.name || 'Deleted User';
+            const partnerAvatar = partner?.avatar || '';
+            const partnerMajor = partner?.academicMajor || 'Undeclared';
 
             return (
               <div key={session._id} className="mentor-exchange-card" style={{ borderLeft: '4px solid #ffffff' }}>
                 <div className="mentor-card-header">
-                  <Avatar src={partner.avatar} name={partner.name} size="44px" />
+                  <Avatar src={partnerAvatar} name={partnerName} size="44px" />
                   <div className="mentor-card-meta">
                     <h4 className="mentor-card-name">
-                      {isMentor ? `Teaching ${partner.name}` : `Learning from ${partner.name}`}
+                      {isMentor ? `Teaching ${partnerName}` : `Learning from ${partnerName}`}
                     </h4>
-                    <span className="mentor-card-sub">{partner.academicMajor || 'Undeclared'}</span>
+                    <span className="mentor-card-sub">{partnerMajor}</span>
                   </div>
                   <div className="compatibility-badge-wrapper">
                     <span className="compatibility-badge perfect">
@@ -193,16 +206,19 @@ const ExchangeRequests = () => {
           {getFilteredRequests().map(req => {
             const isIncoming = req.receiver?._id === user._id;
             const partner = isIncoming ? req.sender : req.receiver;
+            const partnerName = partner?.name || 'Deleted User';
+            const partnerAvatar = partner?.avatar || '';
+            const partnerMajor = partner?.academicMajor || 'Undeclared';
 
             return (
               <div key={req._id} className="mentor-exchange-card">
                 <div className="mentor-card-header">
-                  <Avatar src={partner.avatar} name={partner.name} size="44px" />
+                  <Avatar src={partnerAvatar} name={partnerName} size="44px" />
                   <div className="mentor-card-meta">
                     <h4 className="mentor-card-name">
-                      {isIncoming ? `Swap Request from ${partner.name}` : `Sent Swap Request to ${partner.name}`}
+                      {isIncoming ? `Swap Request from ${partnerName}` : `Sent Swap Request to ${partnerName}`}
                     </h4>
-                    <span className="mentor-card-sub">{partner.academicMajor || 'Undeclared'}</span>
+                    <span className="mentor-card-sub">{partnerMajor}</span>
                   </div>
                   <div className="compatibility-badge-wrapper">
                     <span className="tag-badge">Subject: {req.skill}</span>
@@ -232,8 +248,8 @@ const ExchangeRequests = () => {
           })}
 
           {getFilteredRequests().length === 0 && getFilteredSessions().length === 0 && (
-            <div className="empty-state">
-              <Clock size={32} />
+            <div className="empty-state" style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', padding: '48px 16px', color: 'var(--text-muted)' }}>
+              <Clock size={36} style={{ marginBottom: '12px' }} />
               <p>No transactions or schedules found in this category tab.</p>
             </div>
           )}
