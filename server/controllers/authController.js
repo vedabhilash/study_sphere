@@ -226,6 +226,14 @@ const seedMatchesProduction = async (req, res) => {
         university: 'CollabStudy University',
         bio: 'Coding enthusiast. Love building React web apps and playing tennis.',
         courses: ['CS 101: Introduction to Programming', 'CS 102: Data Structures', 'MATH 201: Calculus'],
+        skillsCanTeach: [
+          { name: 'React', category: 'Programming', level: 'Advanced' },
+          { name: 'Design', category: 'Design', level: 'Intermediate' }
+        ],
+        skillsToLearn: [
+          { name: 'Python', category: 'Programming', priority: 'High' },
+          { name: 'Calculus', category: 'Mathematics', priority: 'Medium' }
+        ],
         weeklyAvailability: {
           monday: ['Afternoon'],
           wednesday: ['Morning'],
@@ -244,6 +252,14 @@ const seedMatchesProduction = async (req, res) => {
         university: 'CollabStudy University',
         bio: 'Focusing on algorithmic problem solving. Prefer visual notes.',
         courses: ['CS 102: Data Structures'],
+        skillsCanTeach: [
+          { name: 'Python', category: 'Programming', level: 'Expert' },
+          { name: 'Data Structures', category: 'Programming', level: 'Expert' }
+        ],
+        skillsToLearn: [
+          { name: 'React', category: 'Programming', priority: 'High' },
+          { name: 'Calculus', category: 'Mathematics', priority: 'Low' }
+        ],
         weeklyAvailability: {
           monday: ['Morning', 'Afternoon'],
           tuesday: ['Afternoon'],
@@ -262,6 +278,13 @@ const seedMatchesProduction = async (req, res) => {
         university: 'CollabStudy University',
         bio: 'First year math student. Looking for intensive study sessions.',
         courses: ['MATH 201: Calculus'],
+        skillsCanTeach: [
+          { name: 'Calculus', category: 'Mathematics', level: 'Expert' }
+        ],
+        skillsToLearn: [
+          { name: 'Python', category: 'Programming', priority: 'High' },
+          { name: 'Design', category: 'Design', priority: 'Medium' }
+        ],
         weeklyAvailability: {
           friday: ['Afternoon', 'Evening'],
           saturday: ['Morning']
@@ -282,6 +305,14 @@ const seedMatchesProduction = async (req, res) => {
         'CS 101: Introduction to Programming',
         'CS 102: Data Structures',
         'MATH 201: Calculus'
+      ];
+      currentUser.skillsCanTeach = [
+        { name: 'React', category: 'Programming', level: 'Intermediate' },
+        { name: 'Calculus', category: 'Mathematics', level: 'Intermediate' }
+      ];
+      currentUser.skillsToLearn = [
+        { name: 'Python', category: 'Programming', priority: 'High' },
+        { name: 'Design', category: 'Design', priority: 'High' }
       ];
       currentUser.weeklyAvailability = {
         monday: ['Afternoon'],
