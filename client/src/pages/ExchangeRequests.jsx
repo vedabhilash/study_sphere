@@ -390,18 +390,38 @@ const ExchangeRequests = () => {
                 className="form-input" 
                 value={bookingDate} 
                 required
+                onClick={(e) => {
+                  try {
+                    e.target.showPicker();
+                  } catch (err) {
+                    // Fallback
+                  }
+                }}
                 onChange={e => setBookingDate(e.target.value)} 
               />
             </div>
             <div className="form-group">
               <label className="form-label">Time</label>
-              <input 
-                type="time" 
+              <select 
                 className="form-input" 
                 value={bookingTime} 
                 required
                 onChange={e => setBookingTime(e.target.value)} 
-              />
+              >
+                <option value="">Select Time</option>
+                {Array.from({ length: 29 }).map((_, index) => {
+                  const hour = Math.floor(8 + index / 2);
+                  const minute = index % 2 === 0 ? '00' : '30';
+                  const displayHour = hour.toString().padStart(2, '0');
+                  const timeVal = `${displayHour}:${minute}`;
+                  const period = hour >= 12 ? 'PM' : 'AM';
+                  const displayFormatHour = hour > 12 ? hour - 12 : (hour === 0 ? 12 : hour);
+                  const displayLabel = `${displayFormatHour}:${minute} ${period}`;
+                  return (
+                    <option key={timeVal} value={timeVal}>{displayLabel}</option>
+                  );
+                })}
+              </select>
             </div>
             <div className="form-group">
               <label className="form-label">Duration (minutes)</label>
