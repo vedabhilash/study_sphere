@@ -1,4 +1,4 @@
-import React, { useEffect, useState } from 'react';
+import React, { useEffect, useState, useMemo } from 'react';
 import { Link } from 'react-router-dom';
 import { useAuth } from '../context/AuthContext';
 import { 
@@ -13,27 +13,44 @@ import {
   PlusCircle, 
   MessageSquare, 
   FileText,
-  Award
+  Award,
+  Sparkles
 } from 'lucide-react';
+import Skeleton from '../components/Skeleton';
+import EmptyState from '../components/EmptyState';
+import { groupsAPI, skillsAPI } from '../utils/apiService';
 import './Dashboard.css';
 
 const Dashboard = () => {
   const { user, refreshUser } = useAuth();
   const [upcomingSessions, setUpcomingSessions] = useState([]);
   const [activities, setActivities] = useState([]);
+  const [recommendedGroups, setRecommendedGroups] = useState([]);
+  const [recentRequests, setRecentRequests] = useState([]);
+  const [dashboardLoading, setDashboardLoading] = useState(true);
 
   useEffect(() => {
-    refreshUser();
+    const loadData = async () => {
+      setDashboardLoading(true);
+      try {
+        await refreshUser();
+      } catch (err) {
+        console.error('Error refreshing user details:', err);
+      } finally {
+        setDashboardLoading(false);
+      }
+    };
+    loadData();
   }, []);
 
   useEffect(() => {
-    if (!user || !user.groupsJoined) return;
+    if (!user) return;
 
     // Gather all upcoming sessions from joined groups
     const now = new Date();
     const sessions = [];
 
-    user.groupsJoined.forEach((group) => {
+    (user.groupsJoined || []).forEach((group) => {
       if (group.sessions) {
         group.sessions.forEach((session) => {
           const startTime = new Date(session.startTime);
@@ -48,15 +65,12 @@ const Dashboard = () => {
       }
     });
 
-    // Sort by start time ascending
     sessions.sort((a, b) => new Date(a.startTime) - new Date(b.startTime));
     setUpcomingSessions(sessions);
 
     // Generate recent activity feed
     const mockActivities = [];
-    
-    // Add activity for when user joined groups
-    user.groupsJoined.forEach((group) => {
+    (user.groupsJoined || []).forEach((group) => {
       mockActivities.push({
         id: `join-${group._id}`,
         type: 'join',
@@ -65,7 +79,6 @@ const Dashboard = () => {
         icon: <Users size={16} style={{ color: 'var(--primary)' }} />
       });
 
-      // Add activity for scheduled sessions
       if (group.sessions) {
         group.sessions.forEach((session) => {
           mockActivities.push({
@@ -79,10 +92,75 @@ const Dashboard = () => {
       }
     });
 
-    // Sort activities by time descending
     mockActivities.sort((a, b) => b.time - a.time);
-    setActivities(mockActivities.slice(0, 5)); // show latest 5
+    setActivities(mockActivities.slice(0, 5));
+
+    // Fetch Recommended Groups & Exchange History
+    const fetchExtraData = async () => {
+      try {
+        const publicGroups = await groupsAPI.getPublic();
+        const joinedIds = new Set((user.groupsJoined || []).map(g => g._id));
+        const userCourses = user.courses || [];
+        
+        // Recommend groups that match courses or subject
+        const recs = publicGroups
+          .filter(g => !joinedIds.has(g._id))
+          .filter(g => 
+            userCourses.some(c => 
+              g.subject.toLowerCase().includes(c.toLowerCase()) || 
+              g.name.toLowerCase().includes(c.toLowerCase())
+            ) || true
+          )
+          .slice(0, 3);
+        setRecommendedGroups(recs);
+
+        const history = await skillsAPI.getHistory();
+        if (history && history.requests) {
+          setRecentRequests(history.requests.slice(0, 3));
+        }
+      } catch (err) {
+        console.error('Error fetching dashboard recommended data:', err);
+      }
+    };
+    
+    fetchExtraData();
   }, [user]);
+
+  // Profile Completion % Computation
+  const profileCompletion = useMemo(() => {
+    if (!user) return 0;
+    let score = 0;
+    if (user.bio) score += 15;
+    if (user.academicMajor) score += 15;
+    if (user.yearOfStudy) score += 15;
+    if (user.university) score += 15;
+    if (user.courses && user.courses.length > 0) score += 15;
+    if (user.skillsCanTeach && user.skillsCanTeach.length > 0) score += 15;
+    if (user.skillsToLearn && user.skillsToLearn.length > 0) score += 10;
+    return score;
+  }, [user]);
+
+  if (dashboardLoading) {
+    return (
+      <div className="main-content animate-fade-in" style={{ padding: '32px' }}>
+        <div className="dashboard-container">
+          <Skeleton variant="text" height="40px" width="40%" style={{ marginBottom: '24px' }} />
+          <div className="stats-grid" style={{ display: 'grid', gridTemplateColumns: 'repeat(4, 1fr)', gap: '16px', marginBottom: '28px' }}>
+            <Skeleton variant="card" height="90px" count={4} />
+          </div>
+          <div className="dashboard-grid" style={{ display: 'grid', gridTemplateColumns: '2fr 1fr', gap: '24px' }}>
+            <div style={{ display: 'flex', flexDirection: 'column', gap: '24px' }}>
+              <Skeleton variant="card" height="200px" />
+              <Skeleton variant="card" height="150px" />
+            </div>
+            <div style={{ display: 'flex', flexDirection: 'column', gap: '24px' }}>
+              <Skeleton variant="card" height="250px" />
+            </div>
+          </div>
+        </div>
+      </div>
+    );
+  }
 
   if (!user) return null;
 
@@ -97,6 +175,24 @@ const Dashboard = () => {
           <h1 className="welcome-title">Welcome back, {user.name}!</h1>
           <p className="welcome-subtitle">Ready for another collaborative study session? Let's check what's new.</p>
         </div>
+
+        {/* Profile Completion Panel */}
+        {profileCompletion < 100 && (
+          <div className="glass-panel animate-fade-in" style={{ padding: '16px 24px', marginBottom: '24px', display: 'flex', alignItems: 'center', justifyContent: 'space-between', flexWrap: 'wrap', gap: '16px', background: 'linear-gradient(90deg, rgba(255,255,255,0.02) 0%, rgba(255,255,255,0.05) 100%)', border: '1px solid var(--border-color)' }}>
+            <div style={{ flex: 1, minWidth: '250px' }}>
+              <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: '6px', fontSize: '0.85rem' }}>
+                <span style={{ fontWeight: 600, color: 'var(--text-primary)' }}>Profile Setup Progress</span>
+                <span style={{ fontWeight: 700, color: 'var(--text-primary)' }}>{profileCompletion}% Complete</span>
+              </div>
+              <div style={{ width: '100%', height: '6px', background: '#262626', borderRadius: '3px', overflow: 'hidden' }}>
+                <div style={{ width: `${profileCompletion}%`, height: '100%', background: '#ffffff', transition: 'width 0.4s ease' }} />
+              </div>
+            </div>
+            <Link to="/profile/personal-details" className="btn btn-secondary" style={{ padding: '6px 16px', fontSize: '0.8rem' }}>
+              Complete Profile
+            </Link>
+          </div>
+        )}
 
         {/* Stats Grid */}
         <div className="stats-grid" style={{ display: 'grid', gridTemplateColumns: 'repeat(4, 1fr)', gap: '16px' }}>
@@ -144,7 +240,7 @@ const Dashboard = () => {
         {/* Two Column Dashboard Grid */}
         <div className="dashboard-grid">
           
-          {/* Left Side: My Groups & Recent Activity */}
+          {/* Left Side: My Groups, Recommended Groups, & Skill Requests */}
           <div style={{ display: 'flex', flexDirection: 'column', gap: '28px' }}>
             
             {/* My Groups Panel */}
@@ -161,13 +257,14 @@ const Dashboard = () => {
               </div>
 
               {user.groupsJoined?.length === 0 ? (
-                <div className="empty-state">
-                  <p>You haven't joined any study groups yet.</p>
-                  <Link to="/groups" style={{ color: 'var(--primary-light)', display: 'inline-flex', alignItems: 'center', gap: '4px', marginTop: '12px', fontWeight: 600 }}>
-                    <span>Browse available groups</span>
-                    <ArrowRight size={14} />
-                  </Link>
-                </div>
+                <EmptyState 
+                  icon={Users}
+                  title="No Groups Joined"
+                  description="Join a study group to share resources, chat, and schedule group video sessions."
+                  actionText="Browse Groups"
+                  onAction={() => window.location.href = '/groups'}
+                  style={{ border: 'none', background: 'transparent', padding: '24px 0' }}
+                />
               ) : (
                 <div className="my-groups-grid">
                   {(user.groupsJoined || []).map((group) => (
@@ -206,53 +303,76 @@ const Dashboard = () => {
               )}
             </div>
 
-            {/* Recent Activity Panel */}
+            {/* Recommended Groups Panel */}
             <div className="glass-panel" style={{ padding: '24px' }}>
-              <h2 className="dashboard-panel-title">
-                <Clock size={18} style={{ color: 'var(--accent)' }} />
-                <span>Recent Activity</span>
+              <h2 style={{ fontSize: '1.25rem', display: 'flex', alignItems: 'center', gap: '8px', marginBottom: '20px' }}>
+                <Sparkles size={20} style={{ color: 'var(--accent)' }} />
+                <span>Recommended Groups for You</span>
               </h2>
 
-              {activities.length === 0 ? (
-                <div className="empty-state">
-                  <p>No recent activity. Activities appear as you interact with your groups!</p>
-                </div>
+              {recommendedGroups.length === 0 ? (
+                <p style={{ color: 'var(--text-secondary)', fontSize: '0.9rem', textAlign: 'center', padding: '12px 0' }}>
+                  No recommendations. Add more courses to your profile to get matches!
+                </p>
               ) : (
-                <div className="activity-feed-list">
-                  {activities.map((act) => (
-                    <div key={act.id} className="activity-item">
-                      <div style={{
-                        display: 'flex',
-                        alignItems: 'center',
-                        justifyContent: 'center',
-                        width: '32px',
-                        height: '32px',
-                        borderRadius: '50%',
-                        background: 'rgba(255,255,255,0.05)',
-                        flexShrink: 0
-                      }}>
-                        {act.icon}
+                <div style={{ display: 'flex', flexDirection: 'column', gap: '12px' }}>
+                  {recommendedGroups.map((group) => (
+                    <div key={group._id} style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', padding: '14px', background: 'rgba(255,255,255,0.02)', border: '1px solid var(--border-color)', borderRadius: '4px' }}>
+                      <div>
+                        <span style={{ fontWeight: 600, color: '#fff', fontSize: '0.95rem', display: 'block' }}>{group.name}</span>
+                        <span style={{ fontSize: '0.8rem', color: 'var(--text-secondary)' }}>{group.subject} • {group.members?.length || 0} members</span>
                       </div>
-                      <div className="activity-details">
-                        <span className="activity-text">{act.text}</span>
-                        <span className="activity-time">
-                          {new Date(act.time).toLocaleDateString(undefined, { 
-                            month: 'short', 
-                            day: 'numeric',
-                            hour: '2-digit',
-                            minute: '2-digit'
-                          })}
-                        </span>
-                      </div>
+                      <Link to="/groups" className="btn btn-secondary" style={{ padding: '6px 12px', fontSize: '0.75rem' }}>
+                        Browse
+                      </Link>
                     </div>
                   ))}
                 </div>
               )}
             </div>
+
+            {/* Recent Skill Requests */}
+            <div className="glass-panel" style={{ padding: '24px' }}>
+              <h2 style={{ fontSize: '1.25rem', display: 'flex', alignItems: 'center', gap: '8px', marginBottom: '20px' }}>
+                <MessageSquare size={20} style={{ color: 'var(--success)' }} />
+                <span>Skill Requests</span>
+              </h2>
+
+              {recentRequests.length === 0 ? (
+                <p style={{ color: 'var(--text-secondary)', fontSize: '0.9rem', textAlign: 'center', padding: '12px 0' }}>
+                  No recent exchange requests. Try requesting a skill swap in the Marketplace.
+                </p>
+              ) : (
+                <div style={{ display: 'flex', flexDirection: 'column', gap: '12px' }}>
+                  {recentRequests.map((req) => {
+                    const isSender = req.sender?._id === user._id;
+                    const partner = isSender ? req.receiver : req.sender;
+                    return (
+                      <div key={req._id} style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', padding: '12px', background: 'rgba(255,255,255,0.02)', border: '1px solid var(--border-color)', borderRadius: '4px' }}>
+                        <div>
+                          <span style={{ fontSize: '0.9rem', fontWeight: 600, color: '#fff' }}>
+                            {isSender ? 'Sent to' : 'Received from'} {partner?.name}
+                          </span>
+                          <span style={{ display: 'block', fontSize: '0.8rem', color: 'var(--text-secondary)' }}>
+                            Skill Swap: {req.skill} ({req.status})
+                          </span>
+                        </div>
+                        <Link to="/marketplace" className="btn btn-secondary" style={{ padding: '6px 12px', fontSize: '0.75rem' }}>
+                          Manage
+                        </Link>
+                      </div>
+                    );
+                  })}
+                </div>
+              )}
+            </div>
+
           </div>
 
-          {/* Right Side: Upcoming Sessions Sidebar */}
+          {/* Right Side: Upcoming Sessions, Skill Swap Analytics, & Recent Activity */}
           <div style={{ display: 'flex', flexDirection: 'column', gap: '24px' }}>
+            
+            {/* Upcoming Sessions */}
             <div className="glass-panel" style={{ padding: '24px' }}>
               <h2 className="dashboard-panel-title">
                 <Calendar size={18} style={{ color: 'var(--success)' }} />
@@ -317,8 +437,8 @@ const Dashboard = () => {
 
                 <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '12px' }}>
                   <div style={{ background: '#121212', border: '1px solid var(--border-color)', padding: '12px', borderRadius: '4px', textAlign: 'center' }}>
-                    <span style={{ fontSize: '1.25rem', fontWeight: 800, color: '#fff', display: 'block' }}>{user.completedSessions || 0} hrs</span>
-                    <span style={{ fontSize: '0.7rem', color: 'var(--text-secondary)' }}>Mentored Time</span>
+                    <span style={{ fontSize: '1.25rem', fontWeight: 800, color: '#fff', display: 'block' }}>{user.completedSessions || 0}</span>
+                    <span style={{ fontSize: '0.7rem', color: 'var(--text-secondary)' }}>Sessions Done</span>
                   </div>
                   <div style={{ background: '#121212', border: '1px solid var(--border-color)', padding: '12px', borderRadius: '4px', textAlign: 'center' }}>
                     <span style={{ fontSize: '1.25rem', fontWeight: 800, color: '#fff', display: 'block' }}>★ {user.rating > 0 ? user.rating : 'N/A'}</span>
@@ -344,6 +464,51 @@ const Dashboard = () => {
                 </Link>
               </div>
             </div>
+
+            {/* Recent Activity */}
+            <div className="glass-panel" style={{ padding: '24px' }}>
+              <h2 className="dashboard-panel-title">
+                <Clock size={18} style={{ color: 'var(--accent)' }} />
+                <span>Recent Activity</span>
+              </h2>
+
+              {activities.length === 0 ? (
+                <div className="empty-state">
+                  <p>No recent activity. Activities appear as you interact with your groups!</p>
+                </div>
+              ) : (
+                <div className="activity-feed-list">
+                  {activities.map((act) => (
+                    <div key={act.id} className="activity-item">
+                      <div style={{
+                        display: 'flex',
+                        alignItems: 'center',
+                        justifyContent: 'center',
+                        width: '32px',
+                        height: '32px',
+                        borderRadius: '50%',
+                        background: 'rgba(255, 255, 255, 0.05)',
+                        flexShrink: 0
+                      }}>
+                        {act.icon}
+                      </div>
+                      <div className="activity-details">
+                        <span className="activity-text">{act.text}</span>
+                        <span className="activity-time">
+                          {new Date(act.time).toLocaleDateString(undefined, { 
+                            month: 'short', 
+                            day: 'numeric',
+                            hour: '2-digit',
+                            minute: '2-digit'
+                          })}
+                        </span>
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              )}
+            </div>
+
           </div>
 
         </div>

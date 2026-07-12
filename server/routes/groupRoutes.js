@@ -12,6 +12,7 @@ const {
 const { getMessages, createMessage } = require('../controllers/messageController');
 const { getResources, createResource } = require('../controllers/resourceController');
 const { protect } = require('../middleware/authMiddleware');
+const { validateGroup, validateSession } = require('../middleware/validationMiddleware');
 const upload = require('../middleware/uploadMiddleware');
 
 // All routes here are protected
@@ -19,7 +20,7 @@ router.use(protect);
 
 router.route('/')
   .get(getGroups)
-  .post(createGroup);
+  .post(validateGroup, createGroup);
 
 router.post('/join', joinGroup);
 
@@ -28,7 +29,7 @@ router.route('/:id')
 
 router.delete('/:id/leave', leaveGroup);
 
-router.post('/:id/sessions', createSession);
+router.post('/:id/sessions', validateSession, createSession);
 router.post('/:id/sessions/:sessionId/attend', attendSession);
 
 // Group Message routes

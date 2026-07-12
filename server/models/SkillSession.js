@@ -54,4 +54,8 @@ const skillSessionSchema = new mongoose.Schema({
   }
 });
 
+// Indexes for history filtering and dashboard statistics
+skillSessionSchema.index({ mentor: 1, status: 1 });
+skillSessionSchema.index({ learner: 1, status: 1 });
+
 module.exports = mongoose.model('SkillSession', skillSessionSchema);

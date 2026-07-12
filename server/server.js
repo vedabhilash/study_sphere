@@ -4,8 +4,24 @@ const http = require('http');
 const socketio = require('socket.io');
 const cors = require('cors');
 const path = require('path');
+const helmet = require('helmet');
+const mongoSanitize = require('express-mongo-sanitize');
+const compression = require('compression');
+const rateLimit = require('express-rate-limit');
 const connectDB = require('./config/db');
 const { socketHandler } = require('./socket/socketHandler');
+
+// Validate critical environment variables
+if (process.env.NODE_ENV === 'production') {
+  if (!process.env.JWT_SECRET) {
+    console.error('CRITICAL: JWT_SECRET must be defined in production!');
+    process.exit(1);
+  }
+  if (!process.env.MONGODB_URI) {
+    console.error('CRITICAL: MONGODB_URI must be defined in production!');
+    process.exit(1);
+  }
+}
 
 // Connect to Database
 connectDB();
@@ -46,9 +62,36 @@ const corsOptions = {
   methods: ['GET', 'POST', 'PUT', 'DELETE', 'OPTIONS']
 };
 
+// Rate limiting configurations
+const apiLimiter = rateLimit({
+  windowMs: 15 * 60 * 1000, // 15 minutes
+  max: 100, // Limit each IP to 100 requests per window
+  standardHeaders: true,
+  legacyHeaders: false,
+  message: { message: 'Too many requests from this IP, please try again after 15 minutes' }
+});
+
+const authLimiter = rateLimit({
+  windowMs: 15 * 60 * 1000,
+  max: 10, // Max 10 login/register requests per 15 minutes
+  standardHeaders: true,
+  legacyHeaders: false,
+  message: { message: 'Too many authentication attempts, please try again after 15 minutes' }
+});
+
+app.use(helmet({
+  crossOriginResourcePolicy: { policy: "cross-origin" }
+}));
+app.use(mongoSanitize());
+app.use(compression());
 app.use(cors(corsOptions));
-app.use(express.json());
-app.use(express.urlencoded({ extended: true }));
+app.use(express.json({ limit: '10kb' }));
+app.use(express.urlencoded({ extended: true, limit: '10kb' }));
+
+// Apply rate limits
+app.use('/api/auth/login', authLimiter);
+app.use('/api/auth/register', authLimiter);
+app.use('/api', apiLimiter);
 
 // Serve uploaded static files
 app.use('/uploads', express.static(path.join(__dirname, 'uploads')));
@@ -63,6 +106,11 @@ app.use('/api', require('./routes/skillsRoutes'));
 app.get('/api/health', (req, res) => {
   res.status(200).json({ status: 'OK', message: 'Study Group API is fully functional' });
 });
+
+// Centralized error handlers
+const { notFound, errorHandler } = require('./middleware/errorMiddleware');
+app.use(notFound);
+app.use(errorHandler);
 
 // Configure Socket.io
 const io = socketio(server, {

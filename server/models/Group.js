@@ -64,4 +64,8 @@ const groupSchema = new mongoose.Schema({
   }]
 }, { timestamps: true });
 
+// Indexes for membership check and invite code lookups
+groupSchema.index({ members: 1 });
+groupSchema.index({ inviteCode: 1 }, { unique: true, sparse: true });
+
 module.exports = mongoose.model('Group', groupSchema);

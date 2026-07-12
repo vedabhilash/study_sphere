@@ -1,29 +1,41 @@
 const Message = require('../models/Message');
 const User = require('../models/User');
+const jwt = require('jsonwebtoken');
 
 // Track online users: Map<userId, socketId>
 const onlineUsers = new Map();
 
 const socketHandler = (io) => {
-  io.on('connection', (socket) => {
-    console.log(`User connected: ${socket.id}`);
+  // Authentication middleware for Socket.IO handshake
+  io.use((socket, next) => {
+    const token = socket.handshake.auth?.token;
+    if (!token) {
+      return next(new Error('Authentication error: Token required'));
+    }
+    try {
+      const decoded = jwt.verify(token, process.env.JWT_SECRET || 'supersecretjwtkeyforstudygroupapp');
+      socket.userId = decoded.id;
+      next();
+    } catch (err) {
+      return next(new Error('Authentication error: Invalid token'));
+    }
+  });
 
-    // User logs in / goes online
-    socket.on('userOnline', async (userId) => {
-      if (userId) {
-        onlineUsers.set(userId, socket.id);
-        socket.userId = userId;
-        // Join a personal room named after the userId so signals can be
-        // delivered reliably without a fragile socket-ID lookup.
-        socket.join(userId);
-        
-        // Broadcast presence update
-        io.emit('userStatusUpdate', {
-          userId,
-          status: 'online'
-        });
-      }
-    });
+  io.on('connection', (socket) => {
+    console.log(`User connected (Secure): ${socket.id}`);
+
+    // Register user as online immediately
+    const userId = socket.userId;
+    if (userId) {
+      onlineUsers.set(userId, socket.id);
+      socket.join(userId);
+      
+      // Broadcast presence update
+      io.emit('userStatusUpdate', {
+        userId,
+        status: 'online'
+      });
+    }
 
     // Join a group study room
     socket.on('joinRoom', (groupId) => {

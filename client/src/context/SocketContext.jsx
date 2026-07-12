@@ -38,7 +38,9 @@ export const SocketProvider = ({ children }) => {
 
     // Connect to backend socket server
     const backendUrl = getBackendUrl();
+    const token = localStorage.getItem('token');
     const newSocket = io(backendUrl, {
+      auth: { token },
       autoConnect: true,
       reconnection: true
     });
@@ -47,14 +49,7 @@ export const SocketProvider = ({ children }) => {
 
     newSocket.on('connect', () => {
       console.log('Socket connected:', newSocket.id);
-      // Notify server that this user is online
-      newSocket.emit('userOnline', user._id);
     });
-
-    if (newSocket.connected) {
-      console.log('Socket already connected:', newSocket.id);
-      newSocket.emit('userOnline', user._id);
-    }
 
     newSocket.on('disconnect', (reason) => {
       console.log('Socket disconnected:', reason);

@@ -1,6 +1,5 @@
 import React, { useState, useEffect, useRef } from 'react';
 import { useParams, useNavigate, useSearchParams } from 'react-router-dom';
-import axios from 'axios';
 import { useAuth } from '../context/AuthContext';
 import { useSocket } from '../context/SocketContext';
 import { 
@@ -24,11 +23,16 @@ import {
   ExternalLink,
   ChevronRight,
   Search,
-  Video
+  Video,
+  Smile,
+  CornerDownRight
 } from 'lucide-react';
 import './GroupDetailsPage.css';
 import VirtualRoom from '../components/VirtualRoom';
 import Avatar from '../components/Avatar';
+import Skeleton from '../components/Skeleton';
+import EmptyState from '../components/EmptyState';
+import { groupsAPI, messagesAPI, resourcesAPI } from '../utils/apiService';
 
 const getFullUrl = (url) => {
   if (!url) return '';
@@ -57,6 +61,12 @@ const GroupDetailsPage = () => {
   const typingTimeoutRef = useRef(null);
   const chatBottomRef = useRef(null);
 
+  // Advanced Chat states
+  const [unreadCount, setUnreadCount] = useState(0);
+  const [replyingTo, setReplyingTo] = useState(null);
+  const [showEmojiPicker, setShowEmojiPicker] = useState(false);
+  const [chatLoading, setChatLoading] = useState(false);
+
   // Resources tab states
   const [resources, setResources] = useState([]);
   const [resSearch, setResSearch] = useState('');
@@ -84,6 +94,7 @@ const GroupDetailsPage = () => {
   useEffect(() => {
     if (activeTab === 'chat') {
       fetchMessages();
+      setUnreadCount(0);
     } else if (activeTab === 'resources') {
       fetchResources();
     }
@@ -101,6 +112,9 @@ const GroupDetailsPage = () => {
       if (message.groupId === id) {
         setMessages((prev) => [...prev, message]);
         scrollToBottom();
+        if (activeTab !== 'chat') {
+          setUnreadCount((prev) => prev + 1);
+        }
       }
     });
 
@@ -118,7 +132,7 @@ const GroupDetailsPage = () => {
       socket.off('receiveMessage');
       socket.off('typing');
     };
-  }, [socket, id]);
+  }, [socket, id, activeTab]);
 
   useEffect(() => {
     scrollToBottom();
@@ -127,11 +141,11 @@ const GroupDetailsPage = () => {
   const fetchGroupDetails = async () => {
     try {
       setLoading(true);
-      const res = await axios.get(`/api/groups/${id}`);
-      setGroup(res.data);
+      const data = await groupsAPI.getDetails(id);
+      setGroup(data);
     } catch (err) {
       console.error('Error loading group:', err);
-      alert('Group not found or access denied');
+      alert(err.message || 'Group not found or access denied');
       navigate('/groups');
     } finally {
       setLoading(false);
@@ -139,19 +153,22 @@ const GroupDetailsPage = () => {
   };
 
   const fetchMessages = async () => {
+    setChatLoading(true);
     try {
-      const res = await axios.get(`/api/groups/${id}/messages`);
-      setMessages(res.data);
+      const data = await messagesAPI.getMessages(id);
+      setMessages(data);
       scrollToBottom();
     } catch (err) {
       console.error('Error loading messages:', err);
+    } finally {
+      setChatLoading(false);
     }
   };
 
   const fetchResources = async () => {
     try {
-      const res = await axios.get(`/api/groups/${id}/resources`);
-      setResources(res.data);
+      const data = await resourcesAPI.getResources(id);
+      setResources(data);
     } catch (err) {
       console.error('Error loading resources:', err);
     }
@@ -165,12 +182,12 @@ const GroupDetailsPage = () => {
   const handleLeaveGroup = async () => {
     if (!window.confirm('Are you sure you want to leave this study group?')) return;
     try {
-      await axios.delete(`/api/groups/${id}/leave`);
+      await groupsAPI.leave(id);
       await refreshUser();
       navigate('/');
     } catch (err) {
       console.error('Leave group error:', err);
-      alert(err.response?.data?.message || 'Failed to leave group');
+      alert(err.message || 'Failed to leave group');
     }
   };
 
@@ -188,22 +205,27 @@ const GroupDetailsPage = () => {
       try {
         setChatFile(null);
         setTypedMessage('');
-        await axios.post(`/api/groups/${id}/messages`, formData, {
-          headers: { 'Content-Type': 'multipart/form-data' }
-        });
+        setReplyingTo(null);
+        await messagesAPI.sendMessage(id, formData);
       } catch (err) {
         console.error('Error sending file message:', err);
-        alert('Failed to send attachment');
+        alert(err.message || 'Failed to send attachment');
       }
     } else {
       // Text-only sending via Sockets
       if (socket) {
+        let contentToSend = typedMessage;
+        if (replyingTo) {
+          contentToSend = `Replying to @${replyingTo.senderName}: "${replyingTo.content.substring(0, 40)}${replyingTo.content.length > 40 ? '...' : ''}"\n\n${typedMessage}`;
+        }
+
         socket.emit('sendMessage', {
           groupId: id,
           senderId: user._id,
-          content: typedMessage
+          content: contentToSend
         });
         setTypedMessage('');
+        setReplyingTo(null);
         
         // Stop typing indicator
         socket.emit('typing', { groupId: id, username: user.name, isTyping: false });
@@ -250,9 +272,7 @@ const GroupDetailsPage = () => {
 
     try {
       setResLoading(true);
-      await axios.post(`/api/groups/${id}/resources`, formData, {
-        headers: { 'Content-Type': 'multipart/form-data' }
-      });
+      await resourcesAPI.addResource(id, formData);
       setShowResModal(false);
       setResTitle('');
       setResLink('');
@@ -261,7 +281,7 @@ const GroupDetailsPage = () => {
       fetchResources();
     } catch (err) {
       console.error('Error adding resource:', err);
-      alert(err.response?.data?.message || 'Failed to add resource');
+      alert(err.message || 'Failed to add resource');
     } finally {
       setResLoading(false);
     }
@@ -270,8 +290,8 @@ const GroupDetailsPage = () => {
   // Toggle Like Resource
   const handleToggleLike = async (resId) => {
     try {
-      const res = await axios.post(`/api/resources/${resId}/like`);
-      setResources((prev) => prev.map((r) => r._id === resId ? res.data : r));
+      const data = await resourcesAPI.likeResource(resId);
+      setResources((prev) => prev.map((r) => r._id === resId ? data : r));
     } catch (err) {
       console.error('Like resource error:', err);
     }
@@ -281,7 +301,7 @@ const GroupDetailsPage = () => {
   const handleDeleteResource = async (resId) => {
     if (!window.confirm('Are you sure you want to delete this resource?')) return;
     try {
-      await axios.delete(`/api/resources/${resId}`);
+      await resourcesAPI.deleteResource(resId);
       setResources((prev) => prev.filter((r) => r._id !== resId));
     } catch (err) {
       console.error('Delete resource error:', err);
@@ -296,7 +316,7 @@ const GroupDetailsPage = () => {
 
     try {
       setSessionLoading(true);
-      await axios.post(`/api/groups/${id}/sessions`, {
+      await groupsAPI.scheduleSession(id, {
         title: sessionTitle,
         description: sessionDesc,
         startTime: sessionStart,
@@ -307,10 +327,10 @@ const GroupDetailsPage = () => {
       setSessionDesc('');
       setSessionStart('');
       setSessionEnd('');
-      fetchGroupDetails(); // refresh details (sessions nested inside group)
+      fetchGroupDetails();
     } catch (err) {
       console.error('Schedule session error:', err);
-      alert(err.response?.data?.message || 'Failed to schedule session');
+      alert(err.message || 'Failed to schedule session');
     } finally {
       setSessionLoading(false);
     }
@@ -319,14 +339,54 @@ const GroupDetailsPage = () => {
   // RSVP Session
   const handleSessionRSVP = async (sessionId) => {
     try {
-      const res = await axios.post(`/api/groups/${id}/sessions/${sessionId}/attend`);
+      const data = await groupsAPI.attendSession(id, sessionId);
       setGroup((prev) => {
-        const updatedSessions = prev.sessions.map((s) => s._id === sessionId ? res.data : s);
+        const updatedSessions = prev.sessions.map((s) => s._id === sessionId ? data : s);
         return { ...prev, sessions: updatedSessions };
       });
     } catch (err) {
       console.error('RSVP session error:', err);
     }
+  };
+
+  const handleTriggerReply = (msg) => {
+    const senderName = msg.sender?._id === user._id || msg.sender === user._id ? 'You' : (msg.sender?.name || 'User');
+    setReplyingTo({
+      senderName,
+      content: msg.content,
+      msgId: msg._id
+    });
+  };
+
+  const handleSelectEmoji = (emoji) => {
+    setTypedMessage((prev) => prev + emoji);
+    setShowEmojiPicker(false);
+  };
+
+  const parseMessageContent = (content) => {
+    if (content.startsWith('Replying to @')) {
+      const parts = content.split('\n\n');
+      const replyHeader = parts[0];
+      const actualContent = parts.slice(1).join('\n\n');
+      return (
+        <div>
+          <div style={{
+            background: 'rgba(255, 255, 255, 0.05)',
+            borderLeft: '3px solid var(--primary)',
+            padding: '6px 10px',
+            borderRadius: '4px',
+            fontSize: '0.8rem',
+            marginBottom: '8px',
+            color: 'var(--text-secondary)',
+            fontStyle: 'italic'
+          }}>
+            {replyHeader}
+          </div>
+          <div>{actualContent}</div>
+        </div>
+      );
+    }
+    return <div>{content}</div>;
   };
 
   if (loading) {
@@ -347,6 +407,96 @@ const GroupDetailsPage = () => {
       res.tags.some((t) => t.toLowerCase().includes(term))
     );
   });
+
+  // Render Date Separated Messages
+  const renderMessages = () => {
+    let lastDateStr = '';
+    return messages.map((msg) => {
+      const isMe = msg.sender?._id === user._id || msg.sender === user._id;
+      const senderName = isMe ? 'You' : (msg.sender?.name || 'User');
+      const displayName = isMe ? user.name : (msg.sender?.name || 'User');
+      const senderAvatar = isMe ? user.avatar : msg.sender?.avatar;
+      
+      const msgDate = new Date(msg.timestamp);
+      const dateStr = msgDate.toLocaleDateString(undefined, { weekday: 'long', year: 'numeric', month: 'long', day: 'numeric' });
+      
+      let showSeparator = false;
+      if (dateStr !== lastDateStr) {
+        showSeparator = true;
+        lastDateStr = dateStr;
+      }
+
+      return (
+        <React.Fragment key={msg._id}>
+          {showSeparator && (
+            <div style={{
+              textAlign: 'center',
+              margin: '24px 0 12px 0',
+              fontSize: '0.75rem',
+              color: 'var(--text-muted)',
+              position: 'relative',
+              display: 'flex',
+              alignItems: 'center',
+              justifyContent: 'center'
+            }}>
+              <div style={{ position: 'absolute', width: '100%', height: '1px', background: 'var(--border-color)', zIndex: 1 }} />
+              <span style={{ position: 'relative', background: 'var(--bg-primary)', padding: '0 12px', zIndex: 2 }}>
+                {dateStr}
+              </span>
+            </div>
+          )}
+          <div className={`chat-bubble-container ${isMe ? 'me' : ''}`}>
+            <Avatar src={senderAvatar} name={displayName} size="36px" className="chat-bubble-avatar" />
+            <div className="chat-bubble-content">
+              <span className={`chat-bubble-header ${isMe ? 'me' : ''}`}>
+                {senderName} • {msgDate.toLocaleTimeString(undefined, { hour: '2-digit', minute: '2-digit' })}
+              </span>
+              <div className="chat-bubble-body">
+                {parseMessageContent(msg.content)}
+                
+                {/* If chat has attachment */}
+                {msg.fileUrl && (
+                  <div className="chat-attachment">
+                    <Paperclip size={14} style={{ color: 'var(--accent)', flexShrink: 0 }} />
+                    <span style={{ overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', maxWidth: '160px' }}>
+                      {msg.fileName || 'Attachment'}
+                    </span>
+                    <a 
+                      href={getFullUrl(msg.fileUrl)} 
+                      target="_blank" 
+                      rel="noreferrer" 
+                      className="chat-attachment-link"
+                    >
+                      <Download size={14} />
+                    </a>
+                  </div>
+                )}
+              </div>
+              <button 
+                onClick={() => handleTriggerReply(msg)}
+                style={{
+                  background: 'transparent',
+                  border: 'none',
+                  color: 'var(--text-muted)',
+                  fontSize: '0.75rem',
+                  display: 'flex',
+                  alignItems: 'center',
+                  gap: '4px',
+                  marginTop: '4px',
+                  cursor: 'pointer',
+                  opacity: 0.7
+                }}
+                className="chat-reply-btn"
+              >
+                <CornerDownRight size={12} />
+                <span>Reply</span>
+              </button>
+            </div>
+          </div>
+        </React.Fragment>
+      );
+    });
+  };
 
   return (
     <div className={`main-content animate-fade-in ${activeTab === 'virtual' ? 'virtual-main-content' : ''}`}>
@@ -430,8 +580,22 @@ const GroupDetailsPage = () => {
               className={`group-tab-btn ${activeTab === 'chat' ? 'active' : ''}`}
               onClick={() => setSearchParams({ tab: 'chat' })}
             >
-              <MessageSquare size={18} />
-              <span>Chat Room</span>
+              <div style={{ position: 'relative', display: 'flex', alignItems: 'center', gap: '8px' }}>
+                <MessageSquare size={18} />
+                <span>Chat Room</span>
+                {unreadCount > 0 && (
+                  <span style={{
+                    background: '#e5e5e5',
+                    color: '#000',
+                    fontSize: '0.65rem',
+                    borderRadius: '10px',
+                    padding: '2px 6px',
+                    fontWeight: 'bold'
+                  }}>
+                    {unreadCount}
+                  </span>
+                )}
+              </div>
             </button>
             <button 
               className={`group-tab-btn ${activeTab === 'resources' ? 'active' : ''}`}
@@ -463,50 +627,18 @@ const GroupDetailsPage = () => {
             {activeTab === 'chat' && (
               <div className="chat-container">
                 <div className="chat-messages">
-                  {messages.length === 0 ? (
+                  {chatLoading ? (
+                    <div style={{ padding: '24px' }}>
+                      <Skeleton variant="avatar" count={3} />
+                    </div>
+                  ) : messages.length === 0 ? (
                     <div style={{ margin: 'auto', textAlign: 'center', color: 'var(--text-muted)', maxWidth: '300px' }}>
                       <MessageSquare size={36} style={{ margin: '0 auto 12px auto' }} />
                       <p style={{ fontSize: '0.95rem', fontWeight: 500 }}>No messages yet.</p>
                       <p style={{ fontSize: '0.8rem', marginTop: '4px' }}>Type a message below to start the conversation!</p>
                     </div>
                   ) : (
-                    messages.map((msg) => {
-                      const isMe = msg.sender?._id === user._id || msg.sender === user._id;
-                      const senderName = isMe ? 'You' : (msg.sender?.name || 'User');
-                      const displayName = isMe ? user.name : (msg.sender?.name || 'User');
-                      const senderAvatar = isMe ? user.avatar : msg.sender?.avatar;
-                      return (
-                        <div key={msg._id} className={`chat-bubble-container ${isMe ? 'me' : ''}`}>
-                          <Avatar src={senderAvatar} name={displayName} size="36px" className="chat-bubble-avatar" />
-                          <div className="chat-bubble-content">
-                            <span className={`chat-bubble-header ${isMe ? 'me' : ''}`}>
-                              {senderName} • {new Date(msg.timestamp).toLocaleTimeString(undefined, { hour: '2-digit', minute: '2-digit' })}
-                            </span>
-                            <div className="chat-bubble-body">
-                              {msg.content}
-                              
-                              {/* If chat has attachment */}
-                              {msg.fileUrl && (
-                                <div className="chat-attachment">
-                                  <Paperclip size={14} style={{ color: 'var(--accent)', flexShrink: 0 }} />
-                                  <span style={{ overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', maxWidth: '160px' }}>
-                                    {msg.fileName || 'Attachment'}
-                                  </span>
-                                  <a 
-                                    href={getFullUrl(msg.fileUrl)} 
-                                    target="_blank" 
-                                    rel="noreferrer" 
-                                    className="chat-attachment-link"
-                                  >
-                                    <Download size={14} />
-                                  </a>
-                                </div>
-                              )}
-                            </div>
-                          </div>
-                        </div>
-                      );
-                    })
+                    renderMessages()
                   )}
                   <div ref={chatBottomRef} />
                 </div>
@@ -520,8 +652,60 @@ const GroupDetailsPage = () => {
                   )}
                 </div>
 
+                {/* Reply Indicator Preview */}
+                {replyingTo && (
+                  <div style={{
+                    display: 'flex',
+                    justifyContent: 'space-between',
+                    alignItems: 'center',
+                    padding: '8px 16px',
+                    background: '#121212',
+                    borderTop: '1px solid var(--border-color)',
+                    fontSize: '0.8rem',
+                    color: 'var(--text-secondary)'
+                  }}>
+                    <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
+                      <CornerDownRight size={14} style={{ color: 'var(--text-muted)' }} />
+                      <span>Replying to <strong>@{replyingTo.senderName}</strong>: <span style={{ fontStyle: 'italic' }}>"{replyingTo.content.substring(0, 40)}"</span></span>
+                    </div>
+                    <button 
+                      onClick={() => setReplyingTo(null)}
+                      style={{ background: 'transparent', border: 'none', color: 'var(--text-muted)', cursor: 'pointer' }}
+                    >
+                      <X size={14} />
+                    </button>
+                  </div>
+                )}
+
+                {/* Emoji Picker Popover */}
+                {showEmojiPicker && (
+                  <div style={{
+                    position: 'absolute',
+                    bottom: '70px',
+                    right: '24px',
+                    background: '#121212',
+                    border: '1px solid var(--border-color)',
+                    borderRadius: '8px',
+                    padding: '8px',
+                    display: 'grid',
+                    gridTemplateColumns: 'repeat(5, 1fr)',
+                    gap: '6px',
+                    zIndex: 100
+                  }}>
+                    {['😂', '👍', '❤️', '🎉', '🔥', '😮', '😢', '🙌', '💡', '✅'].map(emoji => (
+                      <button 
+                        key={emoji}
+                        onClick={() => handleSelectEmoji(emoji)}
+                        style={{ background: 'transparent', border: 'none', fontSize: '1.25rem', padding: '4px', cursor: 'pointer' }}
+                      >
+                        {emoji}
+                      </button>
+                    ))}
+                  </div>
+                )}
+
                 {/* Input area */}
-                <form onSubmit={handleSendMessage} className="chat-input-area">
+                <form onSubmit={handleSendMessage} className="chat-input-area" style={{ position: 'relative' }}>
                   <div style={{ position: 'relative' }}>
                     <label htmlFor="chat-file-input" style={{ cursor: 'pointer', display: 'flex', color: chatFile ? 'var(--accent)' : 'var(--text-secondary)' }} title="Attach File">
                       <Paperclip size={20} />
@@ -542,6 +726,15 @@ const GroupDetailsPage = () => {
                     value={typedMessage}
                     onChange={handleTypingInput}
                   />
+
+                  <button 
+                    type="button"
+                    onClick={() => setShowEmojiPicker(!showEmojiPicker)}
+                    style={{ background: 'transparent', border: 'none', cursor: 'pointer', display: 'flex', color: 'var(--text-secondary)' }}
+                    title="Insert Emoji"
+                  >
+                    <Smile size={20} />
+                  </button>
 
                   <button type="submit" className="btn btn-primary" style={{ padding: '10px 16px' }}>
                     <Send size={16} />

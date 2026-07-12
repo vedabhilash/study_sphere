@@ -1,5 +1,5 @@
 import React, { createContext, useState, useEffect, useContext } from 'react';
-import axios from 'axios';
+import { authAPI } from '../utils/apiService';
 
 const AuthContext = createContext(null);
 
@@ -10,13 +10,11 @@ export const AuthProvider = ({ children }) => {
   const [token, setToken] = useState(localStorage.getItem('token') || '');
   const [loading, setLoading] = useState(true);
 
-  // Set default authorization header for Axios
+  // Set token in localStorage on token change
   useEffect(() => {
     if (token) {
-      axios.defaults.headers.common['Authorization'] = `Bearer ${token}`;
       localStorage.setItem('token', token);
     } else {
-      delete axios.defaults.headers.common['Authorization'];
       localStorage.removeItem('token');
     }
   }, [token]);
@@ -32,8 +30,8 @@ export const AuthProvider = ({ children }) => {
 
       try {
         setLoading(true);
-        const res = await axios.get('/api/auth/me');
-        setUser(res.data);
+        const data = await authAPI.getMe();
+        setUser(data);
       } catch (err) {
         console.error('Error loading user profile:', err);
         // If token expired or invalid, reset
@@ -50,24 +48,22 @@ export const AuthProvider = ({ children }) => {
   // Register User
   const register = async (name, email, password) => {
     try {
-      const res = await axios.post('/api/auth/register', { name, email, password });
-      setToken(res.data.token);
+      const data = await authAPI.register(name, email, password);
+      setToken(data.token);
       return { success: true };
     } catch (err) {
-      const message = err.response?.data?.message || 'Registration failed';
-      return { success: false, error: message };
+      return { success: false, error: err.message };
     }
   };
 
   // Login User
   const login = async (email, password) => {
     try {
-      const res = await axios.post('/api/auth/login', { email, password });
-      setToken(res.data.token);
+      const data = await authAPI.login(email, password);
+      setToken(data.token);
       return { success: true };
     } catch (err) {
-      const message = err.response?.data?.message || 'Login failed';
-      return { success: false, error: message };
+      return { success: false, error: err.message };
     }
   };
 
@@ -81,8 +77,8 @@ export const AuthProvider = ({ children }) => {
   const refreshUser = async () => {
     if (!token) return;
     try {
-      const res = await axios.get('/api/auth/me');
-      setUser(res.data);
+      const data = await authAPI.getMe();
+      setUser(data);
     } catch (err) {
       console.error('Error refreshing user profile:', err);
     }

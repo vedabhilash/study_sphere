@@ -7,6 +7,8 @@ import {
 } from 'lucide-react';
 import axios from 'axios';
 import Avatar from './Avatar';
+import Whiteboard from './Whiteboard';
+import MeetingChat from './MeetingChat';
 
 // STUN servers are free/public - they help peers discover their public address.
 // TURN servers relay media and are required when direct P2P fails (symmetric NAT,
@@ -98,16 +100,25 @@ export default function VirtualRoom({ group, currentStudent, allStudents, socket
   const [showLeavePopover, setShowLeavePopover] = useState(false);
   const [showLayoutPopover, setShowLayoutPopover] = useState(false);
 
-  // Meeting Chat
-  const [inMeetingMessages, setInMeetingMessages] = useState([]);
-  const [chatInput, setChatInput] = useState('');
-  const [replyingTo, setReplyingTo] = useState(null);
-
-  // Collaborative Whiteboard Canvas States
-  const canvasRef = useRef(null);
-  const [isDrawing, setIsDrawing] = useState(false);
-  const [color, setColor] = useState('#aeff00'); 
-  const [lineWidth, setLineWidth] = useState(4);
+  // WebRTC unmount cleanup hook to stop camera/mic streams and close peer connections
+  useEffect(() => {
+    return () => {
+      console.log('[WebRTC] Component unmounting, cleaning up streams and peer connections');
+      Object.keys(peerConnections.current).forEach(peerId => {
+        if (peerConnections.current[peerId]) {
+          peerConnections.current[peerId].close();
+        }
+      });
+      peerConnections.current = {};
+      
+      if (localStreamRef.current) {
+        localStreamRef.current.getTracks().forEach(track => track.stop());
+      }
+      if (screenStreamRef.current) {
+        screenStreamRef.current.getTracks().forEach(track => track.stop());
+      }
+    };
+  }, []);
 
   // Admin Check
   const isAdmin = useMemo(() => {
@@ -597,8 +608,7 @@ export default function VirtualRoom({ group, currentStudent, allStudents, socket
     setVideoOn(true);
     setRaisedHand(false);
     setParticipants({});
-    setInMeetingMessages([]);
-    setReplyingTo(null);
+
     setRemoteVideoStreams({});
     remoteStreams.current = {};
 
@@ -1011,9 +1021,7 @@ export default function VirtualRoom({ group, currentStudent, allStudents, socket
       displayReaction(name, emoji);
     };
 
-    const handleReceiveMeetingMessage = (msg) => {
-      setInMeetingMessages(prev => [...prev, msg]);
-    };
+
 
     const handleIncomingMeetingControl = ({ command, targetId, value }) => {
       if (command === 'lock') {
@@ -1045,7 +1053,6 @@ export default function VirtualRoom({ group, currentStudent, allStudents, socket
     socket.on('meetingUserOffline', handleUserOffline);
     socket.on('meetingStatusUpdate', handleStatusUpdate);
     socket.on('incomingEmojiReaction', handleIncomingEmojiReaction);
-    socket.on('receiveMeetingMessage', handleReceiveMeetingMessage);
     socket.on('incomingMeetingControl', handleIncomingMeetingControl);
 
     console.log('[Meeting] Socket listeners registered');
@@ -1057,7 +1064,6 @@ export default function VirtualRoom({ group, currentStudent, allStudents, socket
       socket.off('meetingUserOffline', handleUserOffline);
       socket.off('meetingStatusUpdate', handleStatusUpdate);
       socket.off('incomingEmojiReaction', handleIncomingEmojiReaction);
-      socket.off('receiveMeetingMessage', handleReceiveMeetingMessage);
       socket.off('incomingMeetingControl', handleIncomingMeetingControl);
       console.log('[Meeting] Socket listeners cleaned up');
     };
@@ -1117,28 +1123,7 @@ export default function VirtualRoom({ group, currentStudent, allStudents, socket
   };
 
   // Send in-call chat message
-  const sendMeetingChat = (e) => {
-    e.preventDefault();
-    if (!chatInput.trim() || !socket) return;
 
-    const msg = {
-      id: Math.random().toString(36).substr(2, 9),
-      senderId: currentStudent.id,
-      senderName: currentStudent.name,
-      senderAvatar: currentStudent.avatar,
-      text: chatInput.trim(),
-      timestamp: new Date().toISOString(),
-      replyTo: replyingTo ? { text: replyingTo.text, senderName: replyingTo.senderName } : null
-    };
-
-    socket.emit('sendMeetingMessage', {
-      groupId: group.id,
-      message: msg
-    });
-
-    setChatInput('');
-    setReplyingTo(null);
-  };
 
   // Admin Actions: Mute peer
   const adminMutePeer = (peerId) => {
@@ -1175,107 +1160,7 @@ export default function VirtualRoom({ group, currentStudent, allStudents, socket
     });
   };
 
-  // Whiteboard drawing hook relays
-  useEffect(() => {
-    if (!socket || !joined || !showWhiteboard) return;
 
-    const canvas = canvasRef.current;
-    if (!canvas) return;
-    const ctx = canvas.getContext('2d');
-    if (!ctx) return;
-
-    // Set canvas dimensions
-    const rect = canvas.getBoundingClientRect();
-    canvas.width = rect.width || 400;
-    canvas.height = rect.height || 350;
-
-    const handleIncomingDraw = (strokeData) => {
-      const c = canvasRef.current;
-      if (!c) return;
-      const context = c.getContext('2d');
-      if (strokeData.type === 'start') {
-        context.beginPath();
-        context.moveTo(strokeData.x, strokeData.y);
-        context.strokeStyle = strokeData.color;
-        context.lineWidth = strokeData.lineWidth;
-        context.lineCap = 'round';
-        context.lineJoin = 'round';
-      } else if (strokeData.type === 'draw') {
-        context.lineTo(strokeData.x, strokeData.y);
-        context.stroke();
-      }
-    };
-
-    const handleIncomingClearBoard = () => {
-      const c = canvasRef.current;
-      if (!c) return;
-      const context = c.getContext('2d');
-      context.clearRect(0, 0, c.width, c.height);
-    };
-
-    socket.on('incomingDraw', handleIncomingDraw);
-    socket.on('incomingClearBoard', handleIncomingClearBoard);
-
-    return () => {
-      socket.off('incomingDraw', handleIncomingDraw);
-      socket.off('incomingClearBoard', handleIncomingClearBoard);
-    };
-  }, [socket, joined, showWhiteboard]);
-
-  const startDrawing = (e) => {
-    const canvas = canvasRef.current;
-    const ctx = canvas.getContext('2d');
-    const rect = canvas.getBoundingClientRect();
-    const x = e.clientX - rect.left;
-    const y = e.clientY - rect.top;
-
-    ctx.beginPath();
-    ctx.moveTo(x, y);
-    ctx.strokeStyle = color;
-    ctx.lineWidth = lineWidth;
-    ctx.lineCap = 'round';
-    ctx.lineJoin = 'round';
-    setIsDrawing(true);
-
-    if (socket) {
-      socket.emit('draw', {
-        groupId: group.id,
-        strokeData: { type: 'start', x, y, color, lineWidth }
-      });
-    }
-  };
-
-  const draw = (e) => {
-    if (!isDrawing) return;
-    const canvas = canvasRef.current;
-    const ctx = canvas.getContext('2d');
-    const rect = canvas.getBoundingClientRect();
-    const x = e.clientX - rect.left;
-    const y = e.clientY - rect.top;
-
-    ctx.lineTo(x, y);
-    ctx.stroke();
-
-    if (socket) {
-      socket.emit('draw', {
-        groupId: group.id,
-        strokeData: { type: 'draw', x, y }
-      });
-    }
-  };
-
-  const stopDrawing = () => {
-    setIsDrawing(false);
-  };
-
-  const clearCanvas = () => {
-    const canvas = canvasRef.current;
-    const ctx = canvas.getContext('2d');
-    ctx.clearRect(0, 0, canvas.width, canvas.height);
-    if (socket) {
-      socket.emit('clearBoard', { groupId: group.id });
-    }
-  };
 
   // RENDER LOBBY / PREVIEW LOBBY
   if (!joined) {
@@ -1483,50 +1368,12 @@ export default function VirtualRoom({ group, currentStudent, allStudents, socket
             
             {/* Whiteboard display */}
             {showWhiteboard && (
-              <div className="meeting-whiteboard-wrapper glass-panel animate-fade-in">
-                <div className="whiteboard-title-row">
-                  <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
-                    <Edit3 size={16} className="text-primary" />
-                    <span style={{ fontSize: '0.9rem', fontWeight: 600 }}>Interactive Sketchpad</span>
-                  </div>
-                  <button onClick={clearCanvas} className="btn-icon-small text-danger" title="Clear board">
-                    <Trash2 size={14} />
-                  </button>
+              <div className="meeting-whiteboard-wrapper glass-panel animate-fade-in" style={{ display: 'flex', flexDirection: 'column', gap: '8px', padding: '16px' }}>
+                <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+                  <Edit3 size={16} className="text-primary" />
+                  <span style={{ fontSize: '0.9rem', fontWeight: 600 }}>Interactive Sketchpad</span>
                 </div>
-                
-                <div className="whiteboard-tools-panel">
-                  <div className="color-selectors">
-                    {['#aeff00', '#e11d48', '#10b981', '#f59e0b', '#ffffff'].map(c => (
-                      <span 
-                        key={c}
-                        onClick={() => setColor(c)}
-                        className={`color-bubble ${color === c ? 'active' : ''}`}
-                        style={{ backgroundColor: c }}
-                      />
-                    ))}
-                  </div>
-
-                  <div className="brush-slider">
-                    <input 
-                      type="range" 
-                      min="2" 
-                      max="12" 
-                      value={lineWidth} 
-                      onChange={(e) => setLineWidth(parseInt(e.target.value))} 
-                    />
-                    <span className="slider-label">{lineWidth}px</span>
-                  </div>
-                </div>
-
-                <div className="canvas-frame">
-                  <canvas 
-                    ref={canvasRef}
-                    onMouseDown={startDrawing}
-                    onMouseMove={draw}
-                    onMouseUp={stopDrawing}
-                    onMouseLeave={stopDrawing}
-                  />
-                </div>
+                <Whiteboard group={group} socket={socket} joined={joined} />
               </div>
             )}
 
@@ -1779,52 +1626,7 @@ export default function VirtualRoom({ group, currentStudent, allStudents, socket
 
             {/* TAB 1: MEETING CHAT */}
             {sidebarTab === 'chat' && (
-              <div className="meeting-chat-content">
-                <div className="chat-messages-scroll">
-                  {inMeetingMessages.length === 0 ? (
-                    <div className="chat-empty-slate">
-                      <MessageSquare size={28} className="text-muted" />
-                      <span>Start messaging with classmates in this call.</span>
-                    </div>
-                  ) : (
-                    inMeetingMessages.map(msg => (
-                      <div key={msg.id} className="meeting-chat-bubble">
-                        <div className="bubble-header">
-                          <span className="bubble-sender">{msg.senderName}</span>
-                          <span className="bubble-time">{new Date(msg.timestamp).toLocaleTimeString(undefined, { hour: '2-digit', minute: '2-digit' })}</span>
-                          <button onClick={() => setReplyingTo(msg)} className="reply-shortcut">Reply</button>
-                        </div>
-                        {msg.replyTo && (
-                          <div className="bubble-reply-preview">
-                            <CornerDownRight size={10} />
-                            <span>Replying to <strong>{msg.replyTo.senderName}</strong>: {msg.replyTo.text}</span>
-                          </div>
-                        )}
-                        <p className="bubble-text">{msg.text}</p>
-                      </div>
-                    ))
-                  )}
-                </div>
-
-                <form onSubmit={sendMeetingChat} className="meeting-chat-input-form">
-                  {replyingTo && (
-                    <div className="replying-to-bar">
-                      <span>Replying to {replyingTo.senderName}</span>
-                      <button type="button" onClick={() => setReplyingTo(null)}><X size={12} /></button>
-                    </div>
-                  )}
-                  <div className="input-row">
-                    <input 
-                      type="text" 
-                      placeholder="Type a message..." 
-                      className="chat-input"
-                      value={chatInput}
-                      onChange={(e) => setChatInput(e.target.value)}
-                    />
-                    <button type="submit" className="chat-send-btn"><Send size={14} /></button>
-                  </div>
-                </form>
-              </div>
+              <MeetingChat group={group} socket={socket} currentStudent={currentStudent} joined={joined} />
             )}
 
             {/* TAB 2: PARTICIPANTS */}

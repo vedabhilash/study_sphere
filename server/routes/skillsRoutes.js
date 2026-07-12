@@ -1,6 +1,7 @@
 const express = require('express');
 const router = express.Router();
 const { protect } = require('../middleware/authMiddleware');
+const { validateSession } = require('../middleware/validationMiddleware');
 const {
   getAllSkills,
   addUserSkill,
@@ -33,7 +34,7 @@ router.put('/exchange/request/:id/reject', protect, rejectExchangeRequest);
 router.get('/exchange/history', protect, getExchangeHistory);
 
 // Session & Review
-router.post('/session', protect, bookSession);
+router.post('/session', protect, validateSession, bookSession);
 router.post('/session/review', protect, submitReview);
 
 module.exports = router;

@@ -135,4 +135,8 @@ userSchema.pre('save', async function (next) {
   next();
 });
 
+// Indexes for peer matching and search optimization
+userSchema.index({ academicMajor: 1 });
+userSchema.index({ rating: -1, completedSessions: -1 });
+
 module.exports = mongoose.model('User', userSchema);
