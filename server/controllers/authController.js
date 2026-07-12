@@ -394,6 +394,24 @@ const seedMatchesProduction = async (req, res) => {
   }
 };
 
+// @desc    Get secure TURN credentials for WebRTC
+// @route   GET /api/auth/turn-credentials
+// @access  Private
+const getTurnCredentials = async (req, res) => {
+  try {
+    const apiKey = process.env.METERED_API_KEY || 'c0b50defc681b20bfde41bd070f385d062e9';
+    const response = await fetch(`https://studentstudysphereonline.metered.live/api/v1/turn/credentials?apiKey=${apiKey}`);
+    if (!response.ok) {
+      throw new Error(`Metered API returned status ${response.status}`);
+    }
+    const servers = await response.json();
+    res.status(200).json(servers);
+  } catch (error) {
+    console.error('Error fetching TURN credentials from Metered:', error);
+    res.status(500).json({ message: 'Failed to fetch TURN credentials' });
+  }
+};
+
 module.exports = {
   registerUser,
   loginUser,
@@ -401,5 +419,6 @@ module.exports = {
   updateProfile,
   uploadAvatar,
   getMatches,
-  seedMatchesProduction
+  seedMatchesProduction,
+  getTurnCredentials
 };

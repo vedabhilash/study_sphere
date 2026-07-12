@@ -19,6 +19,10 @@ const getMessages = async (req, res) => {
 
     const messages = await Message.find({ groupId: req.params.id })
       .populate('sender', 'name email avatar')
+      .populate({
+        path: 'replyTo',
+        populate: { path: 'sender', select: 'name' }
+      })
       .sort({ timestamp: 1 });
 
     res.status(200).json(messages);
@@ -32,7 +36,7 @@ const getMessages = async (req, res) => {
 // @route   POST /api/groups/:id/messages
 // @access  Private
 const createMessage = async (req, res) => {
-  const { content } = req.body;
+  const { content, replyTo } = req.body;
   const groupId = req.params.id;
 
   try {
@@ -64,10 +68,16 @@ const createMessage = async (req, res) => {
       sender: req.user.id,
       content: content || '',
       fileUrl,
-      fileName
+      fileName,
+      replyTo: replyTo || null
     });
 
-    const populatedMessage = await message.populate('sender', 'name email avatar');
+    const populatedMessage = await Message.findById(message._id)
+      .populate('sender', 'name email avatar')
+      .populate({
+        path: 'replyTo',
+        populate: { path: 'sender', select: 'name' }
+      });
 
     // Broadcast message via Socket.io if available
     const io = req.app.get('socketio');

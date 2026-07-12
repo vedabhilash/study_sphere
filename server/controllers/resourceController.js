@@ -114,6 +114,16 @@ const toggleLikeResource = async (req, res) => {
       return res.status(404).json({ message: 'Resource not found' });
     }
 
+    const group = await Group.findById(resource.groupId);
+    if (!group) {
+      return res.status(404).json({ message: 'Associated study group not found' });
+    }
+
+    const isMember = group.members.some(memberId => memberId.toString() === req.user.id);
+    if (!isMember && group.admin.toString() !== req.user.id) {
+      return res.status(403).json({ message: 'Not authorized to like resources in this group' });
+    }
+
     const likeIndex = resource.likes.findIndex(likeId => likeId.toString() === req.user.id);
     if (likeIndex > -1) {
       // Unlike

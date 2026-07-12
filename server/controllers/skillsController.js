@@ -457,13 +457,20 @@ const bookSession = async (req, res) => {
     return res.status(400).json({ message: 'Please add all required scheduling fields' });
   }
 
+  const sessionDate = new Date(date);
+  if (sessionDate <= new Date()) {
+    return res.status(400).json({ message: 'Session date and time must be in the future.' });
+  }
+
   try {
     // Verify partner
     const partner = await User.findById(partnerId);
     if (!partner) return res.status(404).json({ message: 'Selected study partner not found' });
 
     // Credits checking: if user is the learner (booking study help), they must have at least 20 credits
-    const learner = req.user;
+    const learner = await User.findById(req.user._id);
+    if (!learner) return res.status(404).json({ message: 'User not found' });
+
     if (learner.credits < 20) {
       return res.status(400).json({ message: 'Insufficient Credits. You need 20 credits to book a learning session.' });
     }
@@ -485,6 +492,10 @@ const bookSession = async (req, res) => {
       meetingLink,
       notes: notes || ''
     });
+
+    // Escrow/Deduct 20 credits from learner immediately at booking
+    learner.credits -= 20;
+    await learner.save();
 
     const populatedSession = await SkillSession.findById(session._id)
       .populate('mentor', 'name avatar')
@@ -542,11 +553,8 @@ const submitReview = async (req, res) => {
     session.feedback = comment || '';
     await session.save();
 
-    // 3. Credit Transaction (Mentor receives 20, Learner loses 20)
+    // 3. Credit Transaction (Mentor receives 20, Learner already paid 20 at booking)
     const mentor = await User.findById(session.mentor);
-    const learner = await User.findById(session.learner);
-
-    learner.credits = Math.max(0, learner.credits - 20);
     mentor.credits = mentor.credits + 20;
 
     // 4. Update Mentor average rating and session count
@@ -556,7 +564,8 @@ const submitReview = async (req, res) => {
     mentor.completedSessions = mentor.completedSessions + 1;
 
     // 5. Evaluate Gamification badges for Mentor
-    const earnedBadges = new Set(mentor.mentorBadges || []);
+    const oldBadges = [...(mentor.mentorBadges || [])];
+    const earnedBadges = new Set(oldBadges);
 
     // Badge Check: React Mentor / Java Expert
     if (session.skill.toLowerCase() === 'react') earnedBadges.add('React Mentor');
@@ -584,9 +593,10 @@ const submitReview = async (req, res) => {
     }
 
     mentor.mentorBadges = [...earnedBadges];
-
-    await learner.save();
     await mentor.save();
+
+    // Identify if a badge was newly earned
+    const newlyEarnedBadge = [...earnedBadges].find(b => !oldBadges.includes(b));
 
     // Notify mentor of review and credit updates
     const io = req.app.get('socketio');
@@ -594,13 +604,59 @@ const submitReview = async (req, res) => {
       io.to(mentor._id.toString()).emit('creditsEarned', {
         credits: 20,
         currentCredits: mentor.credits,
-        badgeEarned: mentor.mentorBadges.length > (mentor.mentorBadges.length - earnedBadges.size) ? [...earnedBadges].pop() : null
+        badgeEarned: newlyEarnedBadge || null
       });
     }
 
     res.status(201).json({ review, session });
   } catch (error) {
     res.status(500).json({ message: 'Failed to submit review', error: error.message });
+  }
+};
+
+// @desc    Cancel a scheduled session and refund credits
+// @route   POST /api/session/:id/cancel
+// @access  Private
+const cancelSession = async (req, res) => {
+  const { id } = req.params;
+
+  try {
+    const session = await SkillSession.findById(id);
+    if (!session) return res.status(404).json({ message: 'Session not found' });
+
+    // Verify authorized user (must be learner or mentor)
+    const isLearner = session.learner.toString() === req.user._id.toString();
+    const isMentor = session.mentor.toString() === req.user._id.toString();
+    if (!isLearner && !isMentor) {
+      return res.status(401).json({ message: 'Not authorized to cancel this session' });
+    }
+
+    if (session.status !== 'Scheduled') {
+      return res.status(400).json({ message: `Cannot cancel a session that is already ${session.status.toLowerCase()}` });
+    }
+
+    // Update status to Cancelled
+    session.status = 'Cancelled';
+    await session.save();
+
+    // Refund credits to learner
+    const learner = await User.findById(session.learner);
+    if (learner) {
+      learner.credits += 20;
+      await learner.save();
+    }
+
+    // Notify partner via socket
+    const partnerId = isLearner ? session.mentor : session.learner;
+    const io = req.app.get('socketio');
+    if (io) {
+      io.to(partnerId.toString()).emit('sessionCancelled', session);
+    }
+
+    res.status(200).json({ success: true, message: 'Session cancelled and credits refunded successfully', session });
+  } catch (error) {
+    console.error('Cancel session error:', error);
+    res.status(500).json({ message: 'Failed to cancel session', error: error.message });
   }
 };
 
@@ -616,5 +672,6 @@ module.exports = {
   rejectExchangeRequest,
   getExchangeHistory,
   bookSession,
-  submitReview
+  submitReview,
+  cancelSession
 };

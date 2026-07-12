@@ -148,20 +148,18 @@ export default function VirtualRoom({ group, currentStudent, allStudents, socket
     return () => clearInterval(timer);
   }, [joined]);
 
-  // Fetch TURN credentials from Metered API dynamically
+  // Fetch TURN credentials from backend dynamically
   useEffect(() => {
     async function fetchIceServers() {
       try {
-        const response = await fetch(
-          "https://studentstudysphereonline.metered.live/api/v1/turn/credentials?apiKey=c0b50defc681b20bfde41bd070f385d062e9"
-        );
-        const servers = await response.json();
+        const response = await axios.get('/api/auth/turn-credentials');
+        const servers = response.data || response;
         if (Array.isArray(servers) && servers.length > 0) {
-          console.log("[WebRTC] Successfully fetched TURN credentials dynamically from Metered");
+          console.log("[WebRTC] Successfully fetched TURN credentials dynamically from backend proxy");
           setIceServers(servers);
         }
       } catch (err) {
-        console.error("Failed to fetch TURN credentials, falling back to STUN only:", err);
+        console.error("Failed to fetch TURN credentials from backend proxy, falling back to STUN only:", err);
       }
     }
     fetchIceServers();
@@ -215,6 +213,7 @@ export default function VirtualRoom({ group, currentStudent, allStudents, socket
   useEffect(() => {
     if (!joined) return;
     let activeStream = null;
+    let wasCreatedInThisEffect = false;
 
     async function startCamera() {
       if (localStream) {
@@ -235,6 +234,7 @@ export default function VirtualRoom({ group, currentStudent, allStudents, socket
 
           setLocalStream(stream);
           activeStream = stream;
+          wasCreatedInThisEffect = true;
           if (localVideoRef.current) {
             localVideoRef.current.srcObject = stream;
           }
@@ -246,6 +246,7 @@ export default function VirtualRoom({ group, currentStudent, allStudents, socket
             const audioOnlyStream = await navigator.mediaDevices.getUserMedia({ video: false, audio: true });
             setLocalStream(audioOnlyStream);
             activeStream = audioOnlyStream;
+            wasCreatedInThisEffect = true;
           } catch (audioErr) {
             console.error("Microphone access failed too:", audioErr);
           }
@@ -258,7 +259,7 @@ export default function VirtualRoom({ group, currentStudent, allStudents, socket
     startCamera();
 
     return () => {
-      if (activeStream) {
+      if (activeStream && wasCreatedInThisEffect) {
         activeStream.getTracks().forEach(track => track.stop());
       }
     };

@@ -2,8 +2,11 @@ const Message = require('../models/Message');
 const User = require('../models/User');
 const jwt = require('jsonwebtoken');
 
-// Track online users: Map<userId, socketId>
+// Track online users: Map<userId, Set<socketId>>
 const onlineUsers = new Map();
+
+// Track whiteboard strokes in memory per meeting room: Map<groupId, array of strokeData>
+const whiteboardState = {};
 
 const socketHandler = (io) => {
   // Authentication middleware for Socket.IO handshake
@@ -27,7 +30,10 @@ const socketHandler = (io) => {
     // Register user as online immediately
     const userId = socket.userId;
     if (userId) {
-      onlineUsers.set(userId, socket.id);
+      if (!onlineUsers.has(userId)) {
+        onlineUsers.set(userId, new Set());
+      }
+      onlineUsers.get(userId).add(socket.id);
       socket.join(userId);
       
       // Broadcast presence update
@@ -47,7 +53,7 @@ const socketHandler = (io) => {
 
     // Send a real-time message (Text-only)
     socket.on('sendMessage', async (messageData) => {
-      const { groupId, senderId, content } = messageData;
+      const { groupId, senderId, content, replyTo } = messageData;
 
       if (!groupId || !senderId || !content) return;
 
@@ -57,10 +63,16 @@ const socketHandler = (io) => {
           sender: senderId,
           content,
           fileUrl: '',
-          fileName: ''
+          fileName: '',
+          replyTo: replyTo || null
         });
 
-        const populatedMessage = await message.populate('sender', 'name email avatar');
+        const populatedMessage = await Message.findById(message._id)
+          .populate('sender', 'name email avatar')
+          .populate({
+            path: 'replyTo',
+            populate: { path: 'sender', select: 'name' }
+          });
 
         // Broadcast to all clients in the group room
         io.to(groupId).emit('receiveMessage', populatedMessage);
@@ -79,9 +91,6 @@ const socketHandler = (io) => {
     });
 
     // WebRTC signaling for peer-to-peer video calls
-    // Use room-based delivery (io.to(targetId)) instead of a socket-ID
-    // lookup so signals are never silently dropped due to race conditions
-    // or reconnections.
     socket.on('videoCallSignal', ({ targetId, signal, senderId }) => {
       io.to(targetId).emit('incomingVideoCallSignal', { senderId, signal });
     });
@@ -90,12 +99,19 @@ const socketHandler = (io) => {
     socket.on('joinMeeting', ({ groupId, student }) => {
       if (student && student.id) {
         socket.join(student.id);
-        onlineUsers.set(student.id, socket.id);
+        if (!onlineUsers.has(student.id)) {
+          onlineUsers.set(student.id, new Set());
+        }
+        onlineUsers.get(student.id).add(socket.id);
         socket.userId = student.id;
       }
       socket.join(`${groupId}-meeting`);
       socket.to(`${groupId}-meeting`).emit('meetingUserJoined', student);
       console.log(`Meeting: ${student.name} joined room ${groupId}-meeting`);
+
+      // Push whiteboard strokes history to the joining student
+      const strokes = whiteboardState[groupId] || [];
+      socket.emit('whiteboardHistory', strokes);
     });
 
     // User leaves meeting room
@@ -123,6 +139,10 @@ const socketHandler = (io) => {
     // Relay whiteboard draw strokes
     socket.on('draw', ({ groupId, strokeData }) => {
       if (groupId) {
+        if (!whiteboardState[groupId]) {
+          whiteboardState[groupId] = [];
+        }
+        whiteboardState[groupId].push(strokeData);
         socket.to(groupId).emit('incomingDraw', strokeData);
       }
     });
@@ -130,6 +150,7 @@ const socketHandler = (io) => {
     // Clear whiteboard request
     socket.on('clearBoard', ({ groupId }) => {
       if (groupId) {
+        whiteboardState[groupId] = [];
         socket.to(groupId).emit('incomingClearBoard');
       }
     });
@@ -137,17 +158,21 @@ const socketHandler = (io) => {
     // Disconnect
     socket.on('disconnect', () => {
       console.log(`User disconnected: ${socket.id}`);
-      if (socket.userId) {
-        onlineUsers.delete(socket.userId);
-        
-        // Broadcast presence update
-        io.emit('userStatusUpdate', {
-          userId: socket.userId,
-          status: 'offline'
-        });
+      if (socket.userId && onlineUsers.has(socket.userId)) {
+        const sockets = onlineUsers.get(socket.userId);
+        sockets.delete(socket.id);
+        if (sockets.size === 0) {
+          onlineUsers.delete(socket.userId);
+          
+          // Broadcast presence update
+          io.emit('userStatusUpdate', {
+            userId: socket.userId,
+            status: 'offline'
+          });
 
-        // Broadcast offline status to active meetings
-        io.emit('meetingUserOffline', socket.userId);
+          // Broadcast offline status to active meetings
+          io.emit('meetingUserOffline', socket.userId);
+        }
       }
     });
   });

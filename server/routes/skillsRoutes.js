@@ -14,7 +14,8 @@ const {
   rejectExchangeRequest,
   getExchangeHistory,
   bookSession,
-  submitReview
+  submitReview,
+  cancelSession
 } = require('../controllers/skillsController');
 
 // Skills management
@@ -36,5 +37,6 @@ router.get('/exchange/history', protect, getExchangeHistory);
 // Session & Review
 router.post('/session', protect, validateSession, bookSession);
 router.post('/session/review', protect, submitReview);
+router.post('/session/:id/cancel', protect, cancelSession);
 
 module.exports = router;

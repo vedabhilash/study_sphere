@@ -199,6 +199,12 @@ const createSession = async (req, res) => {
     return res.status(400).json({ message: 'Title, start time, and end time are required' });
   }
 
+  const start = new Date(startTime);
+  const end = new Date(endTime);
+  if (end <= start) {
+    return res.status(400).json({ message: 'End time must be after the start time' });
+  }
+
   try {
     const group = await Group.findById(req.params.id);
 

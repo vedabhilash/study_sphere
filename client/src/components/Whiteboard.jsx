@@ -6,66 +6,101 @@ export default function Whiteboard({ group, socket, joined }) {
   const [isDrawing, setIsDrawing] = useState(false);
   const [color, setColor] = useState('#aeff00'); 
   const [lineWidth, setLineWidth] = useState(4);
+  const localHistoryRef = useRef([]);
 
   useEffect(() => {
     if (!socket || !joined) return;
 
     const canvas = canvasRef.current;
     if (!canvas) return;
-    const ctx = canvas.getContext('2d');
-    if (!ctx) return;
-
-    // Set canvas dimensions based on client bounds
-    const rect = canvas.getBoundingClientRect();
-    canvas.width = rect.width || 600;
-    canvas.height = rect.height || 450;
-
-    // Ensure line joins are rounded for smooth strokes
-    ctx.lineCap = 'round';
-    ctx.lineJoin = 'round';
+    const parent = canvas.parentElement;
+    if (!parent) return;
 
     const handleIncomingDraw = (strokeData) => {
-      const c = canvasRef.current;
-      if (!c) return;
-      const context = c.getContext('2d');
-      if (strokeData.type === 'start') {
-        context.beginPath();
-        context.moveTo(strokeData.x, strokeData.y);
-        context.strokeStyle = strokeData.color;
-        context.lineWidth = strokeData.lineWidth;
-        context.lineCap = 'round';
-        context.lineJoin = 'round';
-      } else if (strokeData.type === 'draw') {
-        context.lineTo(strokeData.x, strokeData.y);
-        context.stroke();
-      }
+      localHistoryRef.current.push(strokeData);
+      drawStroke(strokeData);
     };
 
     const handleIncomingClearBoard = () => {
-      const c = canvasRef.current;
-      if (!c) return;
-      const context = c.getContext('2d');
-      context.clearRect(0, 0, c.width, c.height);
+      localHistoryRef.current = [];
+      const ctx = canvas.getContext('2d');
+      if (ctx) ctx.clearRect(0, 0, canvas.width, canvas.height);
     };
+
+    const handleWhiteboardHistory = (strokes) => {
+      localHistoryRef.current = strokes;
+      redrawAll();
+    };
+
+    const drawStroke = (strokeData) => {
+      const ctx = canvas.getContext('2d');
+      if (!ctx) return;
+      if (strokeData.type === 'start') {
+        ctx.beginPath();
+        ctx.moveTo(strokeData.xPercent * canvas.width, strokeData.yPercent * canvas.height);
+        ctx.strokeStyle = strokeData.color;
+        ctx.lineWidth = strokeData.lineWidth;
+        ctx.lineCap = 'round';
+        ctx.lineJoin = 'round';
+      } else if (strokeData.type === 'draw') {
+        ctx.lineTo(strokeData.xPercent * canvas.width, strokeData.yPercent * canvas.height);
+        ctx.stroke();
+      }
+    };
+
+    const redrawAll = () => {
+      const ctx = canvas.getContext('2d');
+      if (!ctx) return;
+      ctx.clearRect(0, 0, canvas.width, canvas.height);
+      localHistoryRef.current.forEach(stroke => drawStroke(stroke));
+    };
+
+    const handleResize = () => {
+      const rect = parent.getBoundingClientRect();
+      canvas.width = rect.width || 600;
+      canvas.height = rect.height || 450;
+      redrawAll();
+    };
+
+    // Initialize dimensions
+    handleResize();
+
+    // Use ResizeObserver for responsive layout changes (like toggling sidebars)
+    const resizeObserver = new ResizeObserver(() => {
+      handleResize();
+    });
+    resizeObserver.observe(parent);
 
     socket.on('incomingDraw', handleIncomingDraw);
     socket.on('incomingClearBoard', handleIncomingClearBoard);
+    socket.on('whiteboardHistory', handleWhiteboardHistory);
+
+    // Request initial history refresh in case we joined late
+    socket.emit('joinMeeting', { groupId: group.id || group._id, student: null });
 
     return () => {
+      resizeObserver.disconnect();
       socket.off('incomingDraw', handleIncomingDraw);
       socket.off('incomingClearBoard', handleIncomingClearBoard);
+      socket.off('whiteboardHistory', handleWhiteboardHistory);
     };
-  }, [socket, joined]);
+  }, [socket, joined, group.id, group._id]);
 
   const startDrawing = (e) => {
     const canvas = canvasRef.current;
-    const ctx = canvas.getContext('2d');
+    if (!canvas) return;
     const rect = canvas.getBoundingClientRect();
     const x = e.clientX - rect.left;
     const y = e.clientY - rect.top;
+    const xPercent = x / rect.width;
+    const yPercent = y / rect.height;
 
+    const strokeData = { type: 'start', xPercent, yPercent, color, lineWidth };
+    localHistoryRef.current.push(strokeData);
+
+    const ctx = canvas.getContext('2d');
     ctx.beginPath();
-    ctx.moveTo(x, y);
+    ctx.moveTo(xPercent * canvas.width, yPercent * canvas.height);
     ctx.strokeStyle = color;
     ctx.lineWidth = lineWidth;
     ctx.lineCap = 'round';
@@ -75,7 +110,7 @@ export default function Whiteboard({ group, socket, joined }) {
     if (socket) {
       socket.emit('draw', {
         groupId: group.id || group._id,
-        strokeData: { type: 'start', x, y, color, lineWidth }
+        strokeData
       });
     }
   };
@@ -83,18 +118,24 @@ export default function Whiteboard({ group, socket, joined }) {
   const draw = (e) => {
     if (!isDrawing) return;
     const canvas = canvasRef.current;
-    const ctx = canvas.getContext('2d');
+    if (!canvas) return;
     const rect = canvas.getBoundingClientRect();
     const x = e.clientX - rect.left;
     const y = e.clientY - rect.top;
+    const xPercent = x / rect.width;
+    const yPercent = y / rect.height;
 
-    ctx.lineTo(x, y);
+    const strokeData = { type: 'draw', xPercent, yPercent };
+    localHistoryRef.current.push(strokeData);
+
+    const ctx = canvas.getContext('2d');
+    ctx.lineTo(xPercent * canvas.width, yPercent * canvas.height);
     ctx.stroke();
 
     if (socket) {
       socket.emit('draw', {
         groupId: group.id || group._id,
-        strokeData: { type: 'draw', x, y }
+        strokeData
       });
     }
   };
@@ -104,9 +145,12 @@ export default function Whiteboard({ group, socket, joined }) {
   };
 
   const clearCanvas = () => {
+    localHistoryRef.current = [];
     const canvas = canvasRef.current;
-    const ctx = canvas.getContext('2d');
-    ctx.clearRect(0, 0, canvas.width, canvas.height);
+    if (canvas) {
+      const ctx = canvas.getContext('2d');
+      if (ctx) ctx.clearRect(0, 0, canvas.width, canvas.height);
+    }
     if (socket) {
       socket.emit('clearBoard', { groupId: group.id || group._id });
     }

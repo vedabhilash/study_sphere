@@ -201,6 +201,9 @@ const GroupDetailsPage = () => {
       const formData = new FormData();
       formData.append('content', typedMessage);
       formData.append('file', chatFile);
+      if (replyingTo) {
+        formData.append('replyTo', replyingTo._id);
+      }
       
       try {
         setChatFile(null);
@@ -214,15 +217,11 @@ const GroupDetailsPage = () => {
     } else {
       // Text-only sending via Sockets
       if (socket) {
-        let contentToSend = typedMessage;
-        if (replyingTo) {
-          contentToSend = `Replying to @${replyingTo.senderName}: "${replyingTo.content.substring(0, 40)}${replyingTo.content.length > 40 ? '...' : ''}"\n\n${typedMessage}`;
-        }
-
         socket.emit('sendMessage', {
           groupId: id,
           senderId: user._id,
-          content: contentToSend
+          content: typedMessage,
+          replyTo: replyingTo ? replyingTo._id : null
         });
         setTypedMessage('');
         setReplyingTo(null);
@@ -314,6 +313,13 @@ const GroupDetailsPage = () => {
     e.preventDefault();
     if (!sessionTitle || !sessionStart || !sessionEnd) return;
 
+    const start = new Date(sessionStart);
+    const end = new Date(sessionEnd);
+    if (end <= start) {
+      alert("Session end time must be after the start time.");
+      return;
+    }
+
     try {
       setSessionLoading(true);
       await groupsAPI.scheduleSession(id, {
@@ -350,12 +356,7 @@ const GroupDetailsPage = () => {
   };
 
   const handleTriggerReply = (msg) => {
-    const senderName = msg.sender?._id === user._id || msg.sender === user._id ? 'You' : (msg.sender?.name || 'User');
-    setReplyingTo({
-      senderName,
-      content: msg.content,
-      msgId: msg._id
-    });
+    setReplyingTo(msg);
   };
 
   const handleSelectEmoji = (emoji) => {
@@ -363,11 +364,11 @@ const GroupDetailsPage = () => {
     setShowEmojiPicker(false);
   };
 
-  const parseMessageContent = (content) => {
-    if (content.startsWith('Replying to @')) {
-      const parts = content.split('\n\n');
-      const replyHeader = parts[0];
-      const actualContent = parts.slice(1).join('\n\n');
+  const parseMessageContent = (msg) => {
+    if (msg.replyTo) {
+      const replySender = msg.replyTo.sender?._id === user._id || msg.replyTo.sender === user._id 
+        ? 'You' 
+        : (msg.replyTo.sender?.name || 'User');
       return (
         <div>
           <div style={{
@@ -380,13 +381,13 @@ const GroupDetailsPage = () => {
             color: 'var(--text-secondary)',
             fontStyle: 'italic'
           }}>
-            {replyHeader}
+            Replying to @{replySender}: "{msg.replyTo.content}"
           </div>
-          <div>{actualContent}</div>
+          <div>{msg.content}</div>
         </div>
       );
     }
-    return <div>{content}</div>;
+    return <div>{msg.content}</div>;
   };
 
   if (loading) {
@@ -452,7 +453,7 @@ const GroupDetailsPage = () => {
                 {senderName} • {msgDate.toLocaleTimeString(undefined, { hour: '2-digit', minute: '2-digit' })}
               </span>
               <div className="chat-bubble-body">
-                {parseMessageContent(msg.content)}
+                {parseMessageContent(msg)}
                 
                 {/* If chat has attachment */}
                 {msg.fileUrl && (
@@ -666,7 +667,10 @@ const GroupDetailsPage = () => {
                   }}>
                     <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
                       <CornerDownRight size={14} style={{ color: 'var(--text-muted)' }} />
-                      <span>Replying to <strong>@{replyingTo.senderName}</strong>: <span style={{ fontStyle: 'italic' }}>"{replyingTo.content.substring(0, 40)}"</span></span>
+                      <span>
+                        Replying to <strong>@{replyingTo.sender?._id === user._id || replyingTo.sender === user._id ? 'You' : (replyingTo.sender?.name || 'User')}</strong>:{' '}
+                        <span style={{ fontStyle: 'italic' }}>"{replyingTo.content.substring(0, 40)}{replyingTo.content.length > 40 ? '...' : ''}"</span>
+                      </span>
                     </div>
                     <button 
                       onClick={() => setReplyingTo(null)}
