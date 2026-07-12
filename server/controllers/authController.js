@@ -294,10 +294,69 @@ const seedMatchesProduction = async (req, res) => {
       }
     ];
 
-    await User.insertMany(seedUsers);
+    const insertedUsers = await User.insertMany(seedUsers);
+    const alice = insertedUsers[0];
+    const bob = insertedUsers[1];
+    const clara = insertedUsers[2];
+
+    const Group = require('../models/Group');
+    // Clear existing seeded groups
+    await Group.deleteMany({ name: { $in: ['Algorithms & Data Structures Club', 'Calculus I & II Study Lounge'] } });
+
+    // Seed Groups
+    const nextWeekStart1 = new Date();
+    nextWeekStart1.setDate(nextWeekStart1.getDate() + 7);
+    nextWeekStart1.setHours(14, 0, 0, 0);
+    const nextWeekEnd1 = new Date(nextWeekStart1);
+    nextWeekEnd1.setHours(15, 0, 0, 0);
+
+    const currentUser = await User.findById(req.user.id);
+
+    const group1 = await Group.create({
+      name: 'Algorithms & Data Structures Club',
+      description: 'Weekly practice on coding problems, graphs, sorting, and dynamic programming.',
+      subject: 'Computer Science',
+      admin: alice._id,
+      members: [alice._id, bob._id, currentUser._id],
+      isPrivate: false,
+      inviteCode: 'CSALGO1',
+      sessions: [
+        {
+          title: 'Graph Traversal & BFS/DFS',
+          description: 'Interactive whiteboard session drawing out traversal tracks.',
+          startTime: nextWeekStart1,
+          endTime: nextWeekEnd1,
+          attendees: [alice._id, bob._id, currentUser._id]
+        }
+      ]
+    });
+
+    const nextWeekStart2 = new Date();
+    nextWeekStart2.setDate(nextWeekStart2.getDate() + 5);
+    nextWeekStart2.setHours(10, 0, 0, 0);
+    const nextWeekEnd2 = new Date(nextWeekStart2);
+    nextWeekEnd2.setHours(12, 0, 0, 0);
+
+    const group2 = await Group.create({
+      name: 'Calculus I & II Study Lounge',
+      description: 'Preparation for midterms and practice with integration by parts and limits.',
+      subject: 'Mathematics',
+      admin: clara._id,
+      members: [clara._id, alice._id],
+      isPrivate: false,
+      inviteCode: 'MATHCALC',
+      sessions: [
+        {
+          title: 'Limits & Derivatives Review',
+          description: 'Reviewing practice exams.',
+          startTime: nextWeekStart2,
+          endTime: nextWeekEnd2,
+          attendees: [clara._id, alice._id]
+        }
+      ]
+    });
 
     // 3. Update current user's profile to align
-    const currentUser = await User.findById(req.user.id);
     if (currentUser) {
       currentUser.academicMajor = 'Computer Science';
       currentUser.yearOfStudy = '2';
@@ -321,6 +380,7 @@ const seedMatchesProduction = async (req, res) => {
       };
       currentUser.preferredStudyStyle = 'discussion';
       currentUser.learningGoals = ['Master React Hooks', 'A grade in Calculus', 'Build full-stack side projects'];
+      currentUser.groupsJoined = [group1._id];
       await currentUser.save();
     }
 
